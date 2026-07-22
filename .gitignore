@@ -14,6 +14,7 @@ npm-debug.log*
 # Internal SDD handoff artifacts
 .superpowers/sdd/task-*-brief.md
 .superpowers/sdd/review-task-*.diff
+.superpowers/sdd/review-final-*.diff
 
 # OS junk
 .DS_Store
