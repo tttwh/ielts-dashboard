@@ -6,6 +6,8 @@ test("dashboard shell loads without horizontal overflow", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "IELTS Prep Dashboard" })).toBeVisible();
   await expect(page.getByText("Local mode · cloud-ready schema")).toBeVisible();
   await expect(page.getByRole("progressbar", { name: "Today completion" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "History Summary" })).toBeVisible();
+  await expect(page.getByTestId("history-heatmap").getByRole("button")).toHaveCount(60);
 
   const hasNoHorizontalOverflow = await page.evaluate(() => {
     const { scrollWidth, clientWidth } = document.documentElement;
@@ -20,6 +22,42 @@ test("dashboard shell loads without horizontal overflow", async ({ page }) => {
   });
 
   expect(summaryFitsViewport).toBeTruthy();
+});
+
+test("history heatmap updates today and contains mobile scrolling inside the strip", async ({
+  page
+}, testInfo) => {
+  await page.clock.install({ time: new Date("2026-07-22T08:00:00.000Z") });
+  await page.goto("/");
+
+  const heatmap = page.getByTestId("history-heatmap");
+  const heatmapStrip = page.getByTestId("heatmap-strip");
+
+  await expect(heatmap.getByRole("button", { name: "2026-07-22, 0% complete" })).toBeVisible();
+
+  await page.getByTestId("daily-checkin").getByLabel("Words actual").fill("100");
+
+  const todayCell = heatmap.getByRole("button", { name: "2026-07-22, 13% complete" });
+  await expect(todayCell).toHaveAttribute("data-level", "1");
+  await todayCell.focus();
+  await expect(heatmap.getByTestId("heatmap-day-detail")).toContainText(
+    "2026-07-22 - 13% complete"
+  );
+
+  const pageHasNoHorizontalOverflow = await page.evaluate(() => {
+    const { scrollWidth, clientWidth } = document.documentElement;
+    return scrollWidth <= clientWidth;
+  });
+
+  expect(pageHasNoHorizontalOverflow).toBeTruthy();
+
+  const heatmapFitsViewport = await heatmapStrip.evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    return box.left >= 0 && box.right <= window.innerWidth;
+  });
+
+  expect(heatmapFitsViewport).toBeTruthy();
+  expect(["chromium-desktop", "chromium-mobile"]).toContain(testInfo.project.name);
 });
 
 test("target editing persists after refresh on desktop and mobile", async ({ page, browserName }, testInfo) => {

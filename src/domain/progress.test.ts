@@ -96,8 +96,18 @@ describe("calculateStreak", () => {
 });
 
 describe("buildHeatmapDays", () => {
+  it("returns exactly 60 days ending today", () => {
+    const days = buildHeatmapDays([], "2026-07-22", 60);
+
+    expect(days).toHaveLength(60);
+    expect(days[0]?.date).toBe("2026-05-24");
+    expect(days[59]?.date).toBe("2026-07-22");
+  });
+
   it("includes today and sorts oldest to newest", () => {
-    expect(buildHeatmapDays([baseRecord], "2026-07-22", 3)).toEqual([
+    expect(
+      buildHeatmapDays([{ ...baseRecord, completionRate: 1, isAllClear: true }], "2026-07-22", 3)
+    ).toEqual([
       {
         date: "2026-07-20",
         completionRate: 0,
@@ -112,10 +122,36 @@ describe("buildHeatmapDays", () => {
       },
       {
         date: "2026-07-22",
-        completionRate: 0,
-        isAllClear: false,
-        level: 0
+        completionRate: 1,
+        isAllClear: true,
+        level: 4
       }
     ]);
+  });
+
+  it("maps missing records to zero completion and level 0", () => {
+    const [missingDay] = buildHeatmapDays([baseRecord], "2026-07-22", 2);
+
+    expect(missingDay).toEqual({
+      date: "2026-07-21",
+      completionRate: 0,
+      isAllClear: false,
+      level: 0
+    });
+  });
+
+  it("maps 100 percent completion to level 4", () => {
+    const [day] = buildHeatmapDays(
+      [{ ...baseRecord, completionRate: 1, isAllClear: true }],
+      "2026-07-22",
+      1
+    );
+
+    expect(day).toMatchObject({
+      date: "2026-07-22",
+      completionRate: 1,
+      isAllClear: true,
+      level: 4
+    });
   });
 });

@@ -3,6 +3,7 @@ import { DailyCheckIn } from "./components/checkin/DailyCheckIn";
 import { SummaryHeader } from "./components/summary/SummaryHeader";
 import { TargetDashboard } from "./components/targets/TargetDashboard";
 import { StudyTimerPanel } from "./components/timer/StudyTimerPanel";
+import { Heatmap60 } from "./components/history/Heatmap60";
 import type { DailyRecord } from "./domain/types";
 import { calculateDailyCompletion, calculateStreak } from "./domain/progress";
 import { useDashboardData } from "./hooks/useDashboardData";
@@ -62,6 +63,7 @@ export default function App() {
           today={todayRecord.date}
           userId={state.profile.userId}
         />
+        <Heatmap60 records={state.records} today={todayRecord.date} />
         <TargetDashboard
           dailyGoals={state.dailyGoals}
           profile={state.profile}

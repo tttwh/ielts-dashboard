@@ -25,6 +25,8 @@ describe("App", () => {
     expect(screen.getByText("0 days")).toHaveClass("font-mono");
     expect(screen.getByText("0 XP")).toHaveClass("font-mono");
     expect(screen.getByText("Level 1")).toHaveClass("font-mono");
+    expect(screen.getByRole("heading", { name: "History Summary" })).toBeVisible();
+    expect(within(screen.getByTestId("history-heatmap")).getAllByRole("button")).toHaveLength(60);
     expect(screen.getByRole("main")).toBeVisible();
   });
 
@@ -63,5 +65,18 @@ describe("App", () => {
 
     expect(screen.queryByText("Listening 0/45 min")).not.toBeInTheDocument();
     expect(screen.getByText("Speaking 0/30 min")).toBeVisible();
+  });
+
+  it("updates today's heatmap cell after check-in progress", () => {
+    render(<App />);
+
+    setNumberField("Words actual", "100");
+
+    const heatmap = screen.getByTestId("history-heatmap");
+
+    expect(within(heatmap).getByRole("button", { name: /13% complete/ })).toHaveAttribute(
+      "data-level",
+      "1"
+    );
   });
 });
