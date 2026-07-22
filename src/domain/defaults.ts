@@ -1,5 +1,6 @@
 import type { AppState } from "../services/storage/storageTypes";
-import type { Achievement, DailyGoals, IeltsSection, SectionTargets, UserProfile } from "./types";
+import { createInitialAchievements } from "./achievements";
+import type { DailyGoals, IeltsSection, SectionTargets, UserProfile } from "./types";
 
 export const IELTS_SECTIONS: readonly IeltsSection[] = [
   "listening",
@@ -51,47 +52,6 @@ export function createDefaultDailyGoals(now: string = new Date().toISOString()):
     deletedAt: null,
     syncStatus: "local-only"
   };
-}
-
-export function createInitialAchievements(now: string = new Date().toISOString()): Achievement[] {
-  return [
-    {
-      achievementId: "first-all-clear",
-      userId: "local-user",
-      name: "First All Clear",
-      description: "Complete every enabled daily target once.",
-      category: "milestone",
-      unlockedAt: null,
-      createdAt: now,
-      updatedAt: now,
-      deletedAt: null,
-      syncStatus: "local-only"
-    },
-    {
-      achievementId: "balanced-day",
-      userId: "local-user",
-      name: "Balanced Day",
-      description: "Study all four IELTS sections in one day.",
-      category: "balance",
-      unlockedAt: null,
-      createdAt: now,
-      updatedAt: now,
-      deletedAt: null,
-      syncStatus: "local-only"
-    },
-    {
-      achievementId: "seven-day-streak",
-      userId: "local-user",
-      name: "7-Day Streak",
-      description: "Record study progress for seven consecutive days.",
-      category: "streak",
-      unlockedAt: null,
-      createdAt: now,
-      updatedAt: now,
-      deletedAt: null,
-      syncStatus: "local-only"
-    }
-  ];
 }
 
 export function createDefaultAppState(now: string): AppState {

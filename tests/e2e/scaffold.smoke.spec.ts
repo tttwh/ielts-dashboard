@@ -128,6 +128,13 @@ test("daily check-in reaches all clear without desktop or mobile overflow", asyn
     "100"
   );
 
+  const rewards = page.getByTestId("rewards-panel");
+  await expect(rewards.getByTestId("achievement-all-clear")).not.toHaveAttribute(
+    "aria-disabled",
+    "true"
+  );
+  await expect(rewards.getByText("20/100 XP")).toBeVisible();
+
   const hasNoHorizontalOverflow = await page.evaluate(() => {
     const { scrollWidth, clientWidth } = document.documentElement;
     return scrollWidth <= clientWidth;
@@ -143,6 +150,24 @@ test("daily check-in reaches all clear without desktop or mobile overflow", asyn
   );
 
   expect(checkInRowsFitViewport).toBeTruthy();
+
+  const rewardsFitsViewport = await rewards.evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    return box.left >= 0 && box.right <= window.innerWidth;
+  });
+
+  expect(rewardsFitsViewport).toBeTruthy();
+
+  const rewardBadgesFitViewport = await rewards
+    .locator("[data-testid^='achievement-']")
+    .evaluateAll((badges) =>
+      badges.every((badge) => {
+        const box = badge.getBoundingClientRect();
+        return box.left >= 0 && box.right <= window.innerWidth;
+      })
+    );
+
+  expect(rewardBadgesFitViewport).toBeTruthy();
   expect(["chromium-desktop", "chromium-mobile"]).toContain(testInfo.project.name);
 });
 

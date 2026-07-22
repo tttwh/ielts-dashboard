@@ -4,6 +4,7 @@ import { SummaryHeader } from "./components/summary/SummaryHeader";
 import { TargetDashboard } from "./components/targets/TargetDashboard";
 import { StudyTimerPanel } from "./components/timer/StudyTimerPanel";
 import { Heatmap60 } from "./components/history/Heatmap60";
+import { RewardsPanel } from "./components/rewards/RewardsPanel";
 import type { DailyRecord } from "./domain/types";
 import { calculateDailyCompletion, calculateStreak } from "./domain/progress";
 import { useDashboardData } from "./hooks/useDashboardData";
@@ -22,7 +23,8 @@ export default function App() {
     updateDailyGoals,
     updateProfile,
     updateTodayRecord,
-    addTimerSession
+    addTimerSession,
+    latestUnlockedAchievementId
   } = useDashboardData();
   const summary = calculateDailyCompletion(todayRecord, state.dailyGoals);
   const streakDays = calculateStreak(state.records, todayRecord.date);
@@ -32,14 +34,12 @@ export default function App() {
   return (
     <AppShell
       sidebar={
-        <section className="rounded-[8px] border border-line bg-white p-4 shadow-sm">
-          <h2 className="text-sm font-semibold text-ink">Compact Rail</h2>
-          <div className="mt-3 space-y-2" aria-hidden="true">
-            <div className="h-3 w-3/4 rounded-[4px] bg-soft-line" />
-            <div className="h-3 w-1/2 rounded-[4px] bg-soft-line" />
-            <div className="h-12 rounded-[6px] bg-surface" />
-          </div>
-        </section>
+        <RewardsPanel
+          achievements={state.achievements}
+          latestUnlockedAchievementId={latestUnlockedAchievementId}
+          level={level}
+          xp={xp}
+        />
       }
       summary={
         <SummaryHeader

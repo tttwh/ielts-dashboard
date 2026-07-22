@@ -136,6 +136,42 @@ describe("useDashboardData", () => {
     expect(repo.loadAppState().records[0].completionRate).toBe(0.0625);
   });
 
+  it("evaluates and persists achievement unlocks after today's record changes", () => {
+    const repo = createMemoryRepository();
+    const { result } = renderHook(() => useDashboardData(repo, today));
+
+    act(() => {
+      result.current.updateTodayRecord({
+        words: 100,
+        speakingTopics: 3,
+        listeningTests: 1,
+        corpusMinutes: 30,
+        sectionMinutes: {
+          listening: 45,
+          speaking: 30,
+          reading: 60,
+          writing: 45
+        }
+      });
+    });
+
+    expect(result.current.state.achievements).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          achievementId: "all-clear",
+          unlockedAt: now,
+          syncStatus: "local-only"
+        })
+      ])
+    );
+    expect(result.current.latestUnlockedAchievementId).toBe("all-clear");
+    expect(
+      repo
+        .loadAppState()
+        .achievements.find((achievement) => achievement.achievementId === "all-clear")?.unlockedAt
+    ).toBe(now);
+  });
+
   it("unlocks eligible achievements and persists them", () => {
     const state = createState();
     const repo = createMemoryRepository({
@@ -175,7 +211,7 @@ describe("useDashboardData", () => {
     expect(result.current.state.achievements).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          achievementId: "first-all-clear",
+          achievementId: "all-clear",
           unlockedAt: now,
           syncStatus: "local-only"
         }),

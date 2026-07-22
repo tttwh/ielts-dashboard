@@ -8,8 +8,8 @@ import type {
   TimerSession,
   UserProfile
 } from "../domain/types";
+import { evaluateAchievements } from "../domain/achievements";
 import {
-  calculateStreak,
   createEmptyDailyRecord,
   recalculateDailyRecordProgress
 } from "../domain/progress";
@@ -59,6 +59,7 @@ export interface DashboardData {
   updateDailyGoals(update: DailyGoalsUpdate): void;
   updateTodayRecord(update: DailyRecordUpdate): void;
   addTimerSession(session: TimerSession): void;
+  latestUnlockedAchievementId: string | null;
   unlockAchievementsIfNeeded(): void;
 }
 
@@ -66,28 +67,6 @@ const dateStartIso = (date: string) => `${date}T00:00:00.000Z`;
 
 const activeRecordIndex = (records: DailyRecord[], date: string) =>
   records.findIndex((record) => record.date === date && record.deletedAt === null);
-
-const allSectionMinutesRecorded = (record: DailyRecord) =>
-  Object.values(record.sectionMinutes).every((minutes) => minutes > 0);
-
-const shouldUnlockAchievement = (
-  achievement: Achievement,
-  records: DailyRecord[],
-  today: string
-) => {
-  const activeRecords = records.filter((record) => record.deletedAt === null);
-
-  switch (achievement.achievementId) {
-    case "first-all-clear":
-      return activeRecords.some((record) => record.isAllClear);
-    case "balanced-day":
-      return activeRecords.some(allSectionMinutesRecorded);
-    case "seven-day-streak":
-      return calculateStreak(activeRecords, today) >= 7;
-    default:
-      return false;
-  }
-};
 
 const upsertRecord = (records: DailyRecord[], recordIndex: number, record: DailyRecord) =>
   recordIndex >= 0
@@ -104,33 +83,112 @@ const getRecordForDate = (state: AppState, date: string, now: string) => {
   return { record, recordIndex };
 };
 
+const achievementsEqual = (left: Achievement[], right: Achievement[]) =>
+  left.length === right.length &&
+  left.every((achievement, index) => {
+    const nextAchievement = right[index];
+
+    return (
+      nextAchievement !== undefined &&
+      achievement.achievementId === nextAchievement.achievementId &&
+      achievement.userId === nextAchievement.userId &&
+      achievement.name === nextAchievement.name &&
+      achievement.description === nextAchievement.description &&
+      achievement.category === nextAchievement.category &&
+      achievement.unlockedAt === nextAchievement.unlockedAt &&
+      achievement.createdAt === nextAchievement.createdAt &&
+      achievement.updatedAt === nextAchievement.updatedAt &&
+      achievement.deletedAt === nextAchievement.deletedAt &&
+      achievement.syncStatus === nextAchievement.syncStatus
+    );
+  });
+
+const latestNewUnlockId = (previous: Achievement[], next: Achievement[]) => {
+  const previousUnlocks = new Map(
+    previous.map((achievement) => [achievement.achievementId, achievement.unlockedAt])
+  );
+  const newUnlocks = next.filter(
+    (achievement) => achievement.unlockedAt && !previousUnlocks.get(achievement.achievementId)
+  );
+
+  if (newUnlocks.length === 0) return null;
+
+  return (
+    newUnlocks.find((achievement) => achievement.achievementId === "all-clear")
+      ?.achievementId ?? newUnlocks[newUnlocks.length - 1].achievementId
+  );
+};
+
 export function useDashboardData(
   repository?: AppRepository,
   today: string = todayKey()
 ): DashboardData {
   const repo = useMemo(() => repository ?? createLocalStorageRepository(), [repository]);
   const [state, setState] = useState<AppState>(() => repo.loadAppState());
+  const [latestUnlockedAchievementId, setLatestUnlockedAchievementId] = useState<string | null>(null);
   const stateRef = useRef(state);
 
+  const applyAchievementEvaluation = useCallback(
+    (candidateState: AppState, now: string, previousAchievements: Achievement[]) => {
+      const achievements = evaluateAchievements({
+        achievements: candidateState.achievements,
+        now,
+        records: candidateState.records,
+        timerSessions: candidateState.timerSessions,
+        today,
+        userId: candidateState.profile.userId
+      });
+
+      return {
+        latestUnlockId: latestNewUnlockId(previousAchievements, achievements),
+        nextState: achievementsEqual(candidateState.achievements, achievements)
+          ? candidateState
+          : { ...candidateState, achievements }
+      };
+    },
+    [today]
+  );
+
   useEffect(() => {
-    const nextState = repo.loadAppState();
+    const loadedState = repo.loadAppState();
+    const { latestUnlockId, nextState } = applyAchievementEvaluation(
+      loadedState,
+      new Date().toISOString(),
+      loadedState.achievements
+    );
+
     stateRef.current = nextState;
+    if (nextState !== loadedState) {
+      repo.saveAppState(nextState);
+    }
+    if (latestUnlockId) {
+      setLatestUnlockedAchievementId(latestUnlockId);
+    }
     setState(nextState);
-  }, [repo]);
+  }, [applyAchievementEvaluation, repo]);
 
   const commitState = useCallback(
     (mutation: AppStateMutation) => {
-      const nextState = mutation(stateRef.current);
+      const currentState = stateRef.current;
+      const candidateState = mutation(currentState);
+      const { latestUnlockId, nextState } = applyAchievementEvaluation(
+        candidateState,
+        new Date().toISOString(),
+        currentState.achievements
+      );
 
-      if (nextState === stateRef.current) {
+      if (nextState === currentState) {
         return;
       }
 
       stateRef.current = nextState;
       repo.saveAppState(nextState);
+      if (latestUnlockId) {
+        setLatestUnlockedAchievementId(latestUnlockId);
+      }
       setState(nextState);
     },
-    [repo]
+    [applyAchievementEvaluation, repo]
   );
 
   const todayRecord = useMemo(() => {
@@ -279,27 +337,8 @@ export function useDashboardData(
   );
 
   const unlockAchievementsIfNeeded = useCallback(() => {
-    const now = new Date().toISOString();
-
-    commitState((current) => {
-      let changed = false;
-      const achievements = current.achievements.map((achievement) => {
-        if (achievement.unlockedAt || !shouldUnlockAchievement(achievement, current.records, today)) {
-          return achievement;
-        }
-
-        changed = true;
-        return {
-          ...achievement,
-          unlockedAt: now,
-          updatedAt: now,
-          syncStatus: "local-only" as const
-        };
-      });
-
-      return changed ? { ...current, achievements } : current;
-    });
-  }, [commitState, today]);
+    commitState((current) => current);
+  }, [commitState]);
 
   return {
     state,
@@ -308,6 +347,7 @@ export function useDashboardData(
     updateDailyGoals,
     updateTodayRecord,
     addTimerSession,
+    latestUnlockedAchievementId,
     unlockAchievementsIfNeeded
   };
 }

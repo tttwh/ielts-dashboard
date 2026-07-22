@@ -24,7 +24,9 @@ describe("App", () => {
     expect(within(screen.getByTestId("summary-header")).getByText("0%")).toHaveClass("font-mono");
     expect(screen.getByText("0 days")).toHaveClass("font-mono");
     expect(screen.getByText("0 XP")).toHaveClass("font-mono");
-    expect(screen.getByText("Level 1")).toHaveClass("font-mono");
+    expect(within(screen.getByTestId("summary-header")).getByText("Level 1")).toHaveClass(
+      "font-mono"
+    );
     expect(screen.getByRole("heading", { name: "History Summary" })).toBeVisible();
     expect(within(screen.getByTestId("history-heatmap")).getAllByRole("button")).toHaveLength(60);
     expect(screen.getByRole("main")).toBeVisible();
@@ -39,15 +41,21 @@ describe("App", () => {
     setNumberField("Corpus minutes actual", "30");
 
     expect(screen.getByText("Study time targets pending")).toBeVisible();
-    expect(screen.queryByText("All Clear")).not.toBeInTheDocument();
+    expect(
+      within(screen.getByTestId("daily-checkin")).queryByText("All Clear")
+    ).not.toBeInTheDocument();
 
     for (const label of ["Listening minutes", "Speaking minutes", "Reading minutes", "Writing minutes"]) {
       setNumberField(label, "0");
     }
 
     expect(screen.queryByText("Study time targets pending")).not.toBeInTheDocument();
-    expect(screen.getByText("All Clear")).toBeVisible();
+    expect(within(screen.getByTestId("daily-checkin")).getByText("All Clear")).toBeVisible();
     expect(screen.getByText("120 XP")).toHaveClass("font-mono");
+    expect(
+      within(screen.getByTestId("rewards-panel")).getByTestId("achievement-all-clear")
+    ).not.toHaveAttribute("aria-disabled");
+    expect(within(screen.getByTestId("rewards-panel")).getByText("20/100 XP")).toBeVisible();
   });
 
   it("records manual external time into today's section-minute progress", async () => {
