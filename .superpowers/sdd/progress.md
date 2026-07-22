@@ -10,3 +10,4 @@ Task 5: complete (commits 151de2c..a071e21, review clean; minor: report uses npm
 Task 6: complete (commits ab8fde6..ba82eb2, review clean)
 Task 7: complete (commits 27cde5d..aa01a43, review clean)
 Task 8: complete (commits a5eeeea..53949ce, review clean; minor: exact timer session metadata assertions could be stronger)
+Task 9: complete (commits 53e5686..4f8a836, review clean; minor: mobile e2e uses viewport sizing rather than full touch emulation)
