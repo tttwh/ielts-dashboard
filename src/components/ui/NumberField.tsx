@@ -12,18 +12,44 @@ export interface NumberFieldProps {
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
-const decimalPlacesForStep = (step: number) => {
-  const stepText = String(step);
-  const decimalIndex = stepText.indexOf(".");
+const decimalPlacesForNumber = (value: number) => {
+  const valueText = String(value);
+  const exponentMatch = valueText.match(/e-(\d+)$/);
 
-  return decimalIndex >= 0 ? stepText.length - decimalIndex - 1 : 0;
+  if (exponentMatch) {
+    return Number(exponentMatch[1]);
+  }
+
+  const decimalIndex = valueText.indexOf(".");
+
+  return decimalIndex >= 0 ? valueText.length - decimalIndex - 1 : 0;
 };
 
 const formatValue = (value: number, step: number) => {
-  const decimalPlaces = decimalPlacesForStep(step);
+  const decimalPlaces = decimalPlacesForNumber(step);
 
   return decimalPlaces > 0 ? value.toFixed(decimalPlaces) : String(value);
 };
+
+const normalizeToStep = (value: number, min: number, step: number) => {
+  const decimalPlaces = Math.max(decimalPlacesForNumber(min), decimalPlacesForNumber(step));
+  const scale = 10 ** decimalPlaces;
+  const scaledMin = Math.round(min * scale);
+  const scaledStep = Math.round(step * scale);
+
+  if (scaledStep <= 0) {
+    return value;
+  }
+
+  const scaledValue = Math.round(value * scale);
+  const scaledNormalized =
+    scaledMin + Math.round((scaledValue - scaledMin) / scaledStep) * scaledStep;
+
+  return scaledNormalized / scale;
+};
+
+const normalizeValue = (value: number, min: number, max: number, step: number) =>
+  clamp(normalizeToStep(value, min, step), min, max);
 
 export function NumberField({
   label,
@@ -54,7 +80,7 @@ export function NumberField({
     const parsed = Number(nextValue);
 
     if (Number.isFinite(parsed)) {
-      onChange(clamp(parsed, min, max));
+      onChange(normalizeValue(parsed, min, max, step));
     }
   };
 
@@ -73,11 +99,11 @@ export function NumberField({
       return;
     }
 
-    const clampedValue = clamp(parsed, min, max);
-    setDraftValue(formatValue(clampedValue, step));
+    const normalizedValue = normalizeValue(parsed, min, max, step);
+    setDraftValue(formatValue(normalizedValue, step));
 
-    if (clampedValue !== value) {
-      onChange(clampedValue);
+    if (normalizedValue !== value) {
+      onChange(normalizedValue);
     }
   };
 

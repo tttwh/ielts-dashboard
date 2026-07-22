@@ -52,3 +52,24 @@
 ## Concerns
 
 - Existing untracked SDD review/brief artifacts were present before this task and were left untouched unless explicitly related to Task 6.
+
+## Review Fix: Step Normalization
+
+- Fixed `NumberField` so manually typed finite values are normalized to the nearest valid `min + n * step` value before min/max clamping.
+- Used scaled integer math for normalization so decimal score steps such as `0.5` produce clean numbers like `7.5` without floating-point artifacts.
+- Preserved focused blank behavior: clearing a focused input still leaves the stored value unchanged, and blur restores the current value.
+- Added unit regression coverage for off-step band scores (`7.3` to `7.5`) and whole-number daily goals (`205` words to `210`).
+- Added e2e coverage for a non-Reading daily goal edit: `Corpus minutes` persists as the normalized value (`17` to `15`) after refresh.
+
+## Review Fix Verification
+
+- RED: `npm.cmd run test -- src/components/ui/NumberField.test.tsx src/components/targets/TargetDashboard.test.tsx`
+  - Result: failed as expected before the fix; `7.3` and `205` were passed through unchanged.
+- GREEN: `npm.cmd run test -- src/components/ui/NumberField.test.tsx src/components/targets/TargetDashboard.test.tsx`
+  - Result: 2 test files passed, 7 tests passed.
+- `npm.cmd run test`
+  - Result: 10 test files passed, 35 tests passed.
+- `npm.cmd run build`
+  - Result: `tsc -b && vite build` completed, 29 modules transformed.
+- `npm.cmd run test:e2e`
+  - Result: 4 tests passed across `chromium-desktop` and `chromium-mobile`.

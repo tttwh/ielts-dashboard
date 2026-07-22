@@ -28,12 +28,15 @@ test("target editing persists after refresh on desktop and mobile", async ({ pag
   await page.getByLabel("Total band").fill("7.0");
   await page.getByLabel("Reading band").fill("8.0");
   await page.getByLabel("Reading minutes").fill("90");
+  await page.getByLabel("Corpus minutes").fill("17");
+  await page.getByLabel("Corpus minutes").blur();
 
   await page.reload();
 
   await expect(page.getByLabel("Total band")).toHaveValue("7.0");
   await expect(page.getByLabel("Reading band")).toHaveValue("8.0");
   await expect(page.getByLabel("Reading minutes")).toHaveValue("90");
+  await expect(page.getByLabel("Corpus minutes")).toHaveValue("15");
 
   const hasNoHorizontalOverflow = await page.evaluate(() => {
     const { scrollWidth, clientWidth } = document.documentElement;
