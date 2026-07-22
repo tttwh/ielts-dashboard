@@ -26,11 +26,6 @@ describe("App", () => {
 
     render(<App />);
 
-    for (const label of ["Listening minutes", "Speaking minutes", "Reading minutes", "Writing minutes"]) {
-      await user.clear(screen.getByLabelText(label));
-      await user.type(screen.getByLabelText(label), "0");
-    }
-
     await user.clear(screen.getByLabelText("Words actual"));
     await user.type(screen.getByLabelText("Words actual"), "100");
     await user.clear(screen.getByLabelText("Speaking topics actual"));
@@ -40,6 +35,15 @@ describe("App", () => {
     await user.clear(screen.getByLabelText("Corpus minutes actual"));
     await user.type(screen.getByLabelText("Corpus minutes actual"), "30");
 
+    expect(screen.getByText("Study time targets pending")).toBeVisible();
+    expect(screen.queryByText("All Clear")).not.toBeInTheDocument();
+
+    for (const label of ["Listening minutes", "Speaking minutes", "Reading minutes", "Writing minutes"]) {
+      await user.clear(screen.getByLabelText(label));
+      await user.type(screen.getByLabelText(label), "0");
+    }
+
+    expect(screen.queryByText("Study time targets pending")).not.toBeInTheDocument();
     expect(screen.getByText("All Clear")).toBeVisible();
     expect(screen.getByText("120 XP")).toHaveClass("font-mono");
   });

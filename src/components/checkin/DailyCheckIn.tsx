@@ -1,4 +1,5 @@
 import { Check } from "lucide-react";
+import { IELTS_SECTIONS, SECTION_LABELS } from "../../domain/defaults";
 import type { DailyGoals, DailyRecord } from "../../domain/types";
 import type { DailyRecordUpdate } from "../../hooks/useDashboardData";
 import { NumberField } from "../ui/NumberField";
@@ -13,6 +14,13 @@ interface CheckInTask {
   target: number;
   suffix: string;
   max: number;
+}
+
+interface PendingSectionProgress {
+  id: string;
+  label: string;
+  actual: number;
+  target: number;
 }
 
 interface DailyCheckInProps {
@@ -35,6 +43,11 @@ const rowProgress = (actual: number, target: number) => {
 
 const progressLabel = (progress: number | null) =>
   progress === null ? "Off" : `${Math.round(progress * 100)}%`;
+
+const statusLabel = (label: string, progress: number | null) => {
+  if (progress === null) return `${label} off`;
+  return `${label} ${progress >= 1 ? "complete" : "incomplete"}`;
+};
 
 export function DailyCheckIn({
   dailyGoals,
@@ -79,6 +92,21 @@ export function DailyCheckIn({
       max: 1440
     }
   ];
+  const pendingSectionProgress: PendingSectionProgress[] = IELTS_SECTIONS.flatMap((section) => {
+    const target = dailyGoals.sectionMinutesTarget[section];
+    const actual = todayRecord.sectionMinutes[section];
+
+    if (target <= 0 || actual >= target) return [];
+
+    return [
+      {
+        id: section,
+        label: SECTION_LABELS[section],
+        actual,
+        target
+      }
+    ];
+  });
 
   return (
     <section
@@ -99,7 +127,7 @@ export function DailyCheckIn({
         {tasks.map((task) => {
           const progress = rowProgress(task.actual, task.target);
           const isComplete = progress !== null && progress >= 1;
-          const statusLabel = `${task.label} ${isComplete ? "complete" : "incomplete"}`;
+          const taskStatusLabel = statusLabel(task.label, progress);
 
           return (
             <div
@@ -135,7 +163,8 @@ export function DailyCheckIn({
               </div>
 
               <span
-                aria-label={statusLabel}
+                aria-disabled={progress === null ? "true" : undefined}
+                aria-label={taskStatusLabel}
                 className={`checkin-status-icon${isComplete ? " checkin-status-icon--complete" : ""}`}
               >
                 {isComplete ? <Check aria-hidden="true" size={16} strokeWidth={3} /> : null}
@@ -143,6 +172,24 @@ export function DailyCheckIn({
             </div>
           );
         })}
+        {pendingSectionProgress.length > 0 ? (
+          <div
+            aria-live="polite"
+            className="checkin-study-time-status"
+            data-testid="checkin-study-time-status"
+          >
+            <span className="text-xs font-semibold uppercase tracking-normal text-muted">
+              Study time targets pending
+            </span>
+            <div className="checkin-study-time-summary" aria-label="Pending study time progress">
+              {pendingSectionProgress.map((section) => (
+                <span key={section.id}>
+                  {section.label} {section.actual}/{section.target} min
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </div>
     </section>
   );

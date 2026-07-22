@@ -52,3 +52,31 @@
 ## Concerns
 - Existing completion logic includes section-minute targets. Because Task 7 intentionally does not implement timers or section-minute check-in inputs, filling only the four new Daily Check-In inputs reaches All Clear only when section-minute targets are disabled or already satisfied.
 - Existing untracked SDD brief/review files were left untouched.
+
+## Review Fix: Study-Time All Clear Gate
+
+### Scope
+- Added a compact, non-editable Daily Check-In status row for pending section-minute targets.
+- The row shows `Study time targets pending` plus each incomplete enabled section summary, for example `Listening 0/45 min`.
+- The pending row is hidden when section-minute targets are disabled or already met.
+- Zero-target visible check-in rows now announce an accessible `off` state instead of `incomplete`.
+- Did not add timer controls or section-minute check-in inputs; Task 8 still owns those inputs.
+
+### TDD Evidence
+- RED:
+  - `npm.cmd run test`
+  - Result: FAIL, expected missing `checkin-study-time-status` and missing `Words off` accessibility label.
+- GREEN:
+  - `npm.cmd run test`
+  - Result: PASS, 11 test files, 42 tests.
+
+### Final Verification
+- `npm.cmd run test`
+  - Result: PASS, 11 test files, 42 tests.
+- `npm.cmd run build`
+  - Result: PASS, `tsc -b && vite build`.
+- `npm.cmd run test:e2e`
+  - Result: PASS, 6 Playwright tests.
+
+### Concerns
+- None for this fix.

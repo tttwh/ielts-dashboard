@@ -61,17 +61,25 @@ test("target editing persists after refresh on desktop and mobile", async ({ pag
 test("daily check-in reaches all clear without desktop or mobile overflow", async ({ page }, testInfo) => {
   await page.goto("/");
 
-  const targetDashboard = page.getByTestId("target-dashboard");
-  for (const label of ["Listening minutes", "Speaking minutes", "Reading minutes", "Writing minutes"]) {
-    await targetDashboard.getByLabel(label).fill("0");
-  }
-
   const checkIn = page.getByTestId("daily-checkin");
   await checkIn.getByLabel("Words actual").fill("100");
   await checkIn.getByLabel("Speaking topics actual").fill("3");
   await checkIn.getByLabel("Listening tests actual").fill("1");
   await checkIn.getByLabel("Corpus minutes actual").fill("30");
 
+  await expect(checkIn.getByText("Study time targets pending")).toBeVisible();
+  await expect(checkIn.getByText("Listening 0/45 min")).toBeVisible();
+  await expect(checkIn.getByText("Speaking 0/30 min")).toBeVisible();
+  await expect(checkIn.getByText("Reading 0/60 min")).toBeVisible();
+  await expect(checkIn.getByText("Writing 0/45 min")).toBeVisible();
+  await expect(checkIn.getByText("All Clear")).not.toBeVisible();
+
+  const targetDashboard = page.getByTestId("target-dashboard");
+  for (const label of ["Listening minutes", "Speaking minutes", "Reading minutes", "Writing minutes"]) {
+    await targetDashboard.getByLabel(label).fill("0");
+  }
+
+  await expect(checkIn.getByText("Study time targets pending")).not.toBeVisible();
   await expect(checkIn.getByText("All Clear")).toBeVisible();
   await expect(checkIn.getByLabel("Words complete")).toBeVisible();
   await expect(checkIn.getByLabel("Speaking topics complete")).toBeVisible();
