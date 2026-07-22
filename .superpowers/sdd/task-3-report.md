@@ -52,3 +52,44 @@
 ## Concerns
 
 - On this Windows PowerShell environment, direct `npm` invocation is blocked by execution policy. `npm.cmd` works and was used for verification.
+
+## Review Fix: Nested Validation And Sync Metadata
+
+### Changes Made
+
+- Added cloud-sync-ready metadata to persisted `DailyGoals` and `Achievement` types:
+  - `userId`
+  - `createdAt`
+  - `updatedAt`
+  - `deletedAt`
+  - `syncStatus`
+- Updated default factories so `createDefaultAppState(now)` passes deterministic timestamps into daily goals and initial achievements.
+- Added nested LocalStorage validators for:
+  - `UserProfile`
+  - `DailyGoals`
+  - `DailyRecord`
+  - `TimerSession`
+  - `Achievement`
+- Validators now check required key types and enum values for IELTS sections, timer sources, achievement categories, profile sync status, and persisted sync status.
+- Added storage tests for schema version 1 payloads with malformed nested profile, daily goals, daily record, timer session, and achievement data.
+- Added a focused round-trip test covering daily goals, one daily record with `xpEarned`, one timer session, and an achievement unlock state.
+- Updated the Task 2 progress test `DailyGoals` fixture for the expanded type.
+
+### Commands Run And Results
+
+- `npm.cmd run test -- src/services/storage/localStorageAdapter.test.ts`
+  - RED result: failed with 6 expected failures before the validator/default fixes.
+- `npm.cmd run test -- src/services/storage/localStorageAdapter.test.ts`
+  - GREEN result: passed, 1 test file, 11 tests.
+- `npm.cmd run test -- src/domain/progress.test.ts`
+  - Result: passed, 1 test file, 6 tests.
+- `npm.cmd run build`
+  - Result: initially failed because the new storage test fixture inferred `syncStatus` as `string`.
+- `npm.cmd run test -- src/services/storage/localStorageAdapter.test.ts`
+  - Result after typing the fixture: passed, 1 test file, 11 tests.
+- `npm.cmd run build`
+  - Result: passed, TypeScript build and Vite production build completed.
+
+### Concerns
+
+- No real cloud sync was implemented, per Task 3 constraints.

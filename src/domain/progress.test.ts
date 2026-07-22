@@ -8,6 +8,7 @@ import {
 import type { DailyGoals, DailyRecord } from "./types";
 
 const goals: DailyGoals = {
+  userId: "local-user",
   wordsTarget: 100,
   speakingTopicsTarget: 3,
   listeningTestsTarget: 1,
@@ -17,7 +18,11 @@ const goals: DailyGoals = {
     speaking: 30,
     reading: 60,
     writing: 45
-  }
+  },
+  createdAt: "2026-07-22T00:00:00.000Z",
+  updatedAt: "2026-07-22T00:00:00.000Z",
+  deletedAt: null,
+  syncStatus: "local-only"
 };
 
 const baseRecord: DailyRecord = {

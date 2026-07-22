@@ -33,8 +33,9 @@ export function createDefaultProfile(now: string): UserProfile {
   };
 }
 
-export function createDefaultDailyGoals(): DailyGoals {
+export function createDefaultDailyGoals(now: string = new Date().toISOString()): DailyGoals {
   return {
+    userId: "local-user",
     wordsTarget: 100,
     speakingTopicsTarget: 3,
     listeningTestsTarget: 1,
@@ -44,32 +45,51 @@ export function createDefaultDailyGoals(): DailyGoals {
       speaking: 30,
       reading: 60,
       writing: 45
-    }
+    },
+    createdAt: now,
+    updatedAt: now,
+    deletedAt: null,
+    syncStatus: "local-only"
   };
 }
 
-export function createInitialAchievements(): Achievement[] {
+export function createInitialAchievements(now: string = new Date().toISOString()): Achievement[] {
   return [
     {
       achievementId: "first-all-clear",
+      userId: "local-user",
       name: "First All Clear",
       description: "Complete every enabled daily target once.",
       category: "milestone",
-      unlockedAt: null
+      unlockedAt: null,
+      createdAt: now,
+      updatedAt: now,
+      deletedAt: null,
+      syncStatus: "local-only"
     },
     {
       achievementId: "balanced-day",
+      userId: "local-user",
       name: "Balanced Day",
       description: "Study all four IELTS sections in one day.",
       category: "balance",
-      unlockedAt: null
+      unlockedAt: null,
+      createdAt: now,
+      updatedAt: now,
+      deletedAt: null,
+      syncStatus: "local-only"
     },
     {
       achievementId: "seven-day-streak",
+      userId: "local-user",
       name: "7-Day Streak",
       description: "Record study progress for seven consecutive days.",
       category: "streak",
-      unlockedAt: null
+      unlockedAt: null,
+      createdAt: now,
+      updatedAt: now,
+      deletedAt: null,
+      syncStatus: "local-only"
     }
   ];
 }
@@ -78,9 +98,9 @@ export function createDefaultAppState(now: string): AppState {
   return {
     schemaVersion: 1,
     profile: createDefaultProfile(now),
-    dailyGoals: createDefaultDailyGoals(),
+    dailyGoals: createDefaultDailyGoals(now),
     records: [],
     timerSessions: [],
-    achievements: createInitialAchievements()
+    achievements: createInitialAchievements(now)
   };
 }

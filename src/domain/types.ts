@@ -14,11 +14,16 @@ export interface UserProfile {
 }
 
 export interface DailyGoals {
+  userId: string;
   wordsTarget: number;
   speakingTopicsTarget: number;
   listeningTestsTarget: number;
   corpusMinutesTarget: number;
   sectionMinutesTarget: SectionMinutes;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+  syncStatus: SyncStatus;
 }
 
 export interface DailyRecord {
@@ -59,10 +64,15 @@ export interface TimerSession {
 
 export interface Achievement {
   achievementId: string;
+  userId: string;
   name: string;
   description: string;
   category: "streak" | "skill" | "milestone" | "balance";
   unlockedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+  syncStatus: SyncStatus;
 }
 
 export interface CompletionSummary {
