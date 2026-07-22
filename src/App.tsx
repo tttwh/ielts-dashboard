@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { AppShell } from "./components/layout/AppShell";
 import { DailyCheckIn } from "./components/checkin/DailyCheckIn";
 import { SummaryHeader } from "./components/summary/SummaryHeader";
@@ -8,6 +9,7 @@ import { RewardsPanel } from "./components/rewards/RewardsPanel";
 import type { DailyRecord } from "./domain/types";
 import { calculateDailyCompletion, calculateStreak } from "./domain/progress";
 import { useDashboardData } from "./hooks/useDashboardData";
+import { createLocalStorageRepository } from "./services/storage/appRepository";
 
 const activeRecordXp = (records: DailyRecord[]) =>
   records
@@ -17,6 +19,7 @@ const activeRecordXp = (records: DailyRecord[]) =>
 const calculateLevel = (xp: number) => Math.max(1, Math.floor(Math.max(0, xp) / 100) + 1);
 
 export default function App() {
+  const repository = useMemo(() => createLocalStorageRepository(), []);
   const {
     state,
     todayRecord,
@@ -25,7 +28,7 @@ export default function App() {
     updateTodayRecord,
     addTimerSession,
     latestUnlockedAchievementId
-  } = useDashboardData();
+  } = useDashboardData(repository);
   const summary = calculateDailyCompletion(todayRecord, state.dailyGoals);
   const streakDays = calculateStreak(state.records, todayRecord.date);
   const xp = activeRecordXp(state.records);
