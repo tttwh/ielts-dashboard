@@ -107,3 +107,55 @@ test("daily check-in reaches all clear without desktop or mobile overflow", asyn
   expect(checkInRowsFitViewport).toBeTruthy();
   expect(["chromium-desktop", "chromium-mobile"]).toContain(testInfo.project.name);
 });
+
+test("study timer records reading overtime on desktop and mobile", async ({ page }, testInfo) => {
+  await page.clock.install({ time: new Date("2026-07-22T08:00:00.000Z") });
+  await page.goto("/");
+
+  const timerPanel = page.getByTestId("study-timer-panel");
+  await expect(timerPanel.getByRole("button", { name: "Reading" })).toHaveAttribute(
+    "aria-pressed",
+    "true"
+  );
+  await expect(timerPanel.getByText("Planned 60 min")).toBeVisible();
+
+  await timerPanel.getByRole("button", { name: /start/i }).click();
+  await page.clock.fastForward("01:02:00");
+
+  await expect(timerPanel.getByText("01:02:00")).toBeVisible();
+  await expect(timerPanel.getByText("已超时 2 min")).toBeVisible();
+
+  await timerPanel.getByRole("button", { name: /end and record/i }).click();
+
+  await expect(page.getByText("Reading 0/60 min")).not.toBeVisible();
+  await expect(page.getByText("Reading 62/60 min")).not.toBeVisible();
+  await expect(page.getByText("Speaking 0/30 min")).toBeVisible();
+
+  const hasNoHorizontalOverflow = await page.evaluate(() => {
+    const { scrollWidth, clientWidth } = document.documentElement;
+    return scrollWidth <= clientWidth;
+  });
+
+  expect(hasNoHorizontalOverflow).toBeTruthy();
+  expect(["chromium-desktop", "chromium-mobile"]).toContain(testInfo.project.name);
+});
+
+test("manual external time entry records selected section on desktop and mobile", async ({ page }, testInfo) => {
+  await page.goto("/");
+
+  const timerPanel = page.getByTestId("study-timer-panel");
+  await timerPanel.getByLabel("Manual section").selectOption("writing");
+  await timerPanel.getByLabel("Manual minutes").fill("45");
+  await timerPanel.getByRole("button", { name: /record external time/i }).click();
+
+  await expect(page.getByText("Writing 0/45 min")).not.toBeVisible();
+  await expect(timerPanel.getByText("Manual external time")).toBeVisible();
+
+  const timerPanelFitsViewport = await timerPanel.evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    return box.left >= 0 && box.right <= window.innerWidth;
+  });
+
+  expect(timerPanelFitsViewport).toBeTruthy();
+  expect(["chromium-desktop", "chromium-mobile"]).toContain(testInfo.project.name);
+});

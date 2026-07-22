@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 import App from "./App";
@@ -7,6 +7,13 @@ describe("App", () => {
   beforeEach(() => {
     localStorage.clear();
   });
+
+  const setNumberField = (label: string, value: string) => {
+    const input = screen.getByLabelText(label);
+
+    fireEvent.change(input, { target: { value } });
+    fireEvent.blur(input);
+  };
 
   it("composes the shell with live default dashboard summary values", () => {
     render(<App />);
@@ -21,30 +28,40 @@ describe("App", () => {
     expect(screen.getByRole("main")).toBeVisible();
   });
 
-  it("updates today's check-in values until All Clear appears", async () => {
-    const user = userEvent.setup();
-
+  it("updates today's check-in values until All Clear appears", () => {
     render(<App />);
 
-    await user.clear(screen.getByLabelText("Words actual"));
-    await user.type(screen.getByLabelText("Words actual"), "100");
-    await user.clear(screen.getByLabelText("Speaking topics actual"));
-    await user.type(screen.getByLabelText("Speaking topics actual"), "3");
-    await user.clear(screen.getByLabelText("Listening tests actual"));
-    await user.type(screen.getByLabelText("Listening tests actual"), "1");
-    await user.clear(screen.getByLabelText("Corpus minutes actual"));
-    await user.type(screen.getByLabelText("Corpus minutes actual"), "30");
+    setNumberField("Words actual", "100");
+    setNumberField("Speaking topics actual", "3");
+    setNumberField("Listening tests actual", "1");
+    setNumberField("Corpus minutes actual", "30");
 
     expect(screen.getByText("Study time targets pending")).toBeVisible();
     expect(screen.queryByText("All Clear")).not.toBeInTheDocument();
 
     for (const label of ["Listening minutes", "Speaking minutes", "Reading minutes", "Writing minutes"]) {
-      await user.clear(screen.getByLabelText(label));
-      await user.type(screen.getByLabelText(label), "0");
+      setNumberField(label, "0");
     }
 
     expect(screen.queryByText("Study time targets pending")).not.toBeInTheDocument();
     expect(screen.getByText("All Clear")).toBeVisible();
     expect(screen.getByText("120 XP")).toHaveClass("font-mono");
+  });
+
+  it("records manual external time into today's section-minute progress", async () => {
+    const user = userEvent.setup();
+
+    render(<App />);
+
+    expect(screen.getByText("Listening 0/45 min")).toBeVisible();
+
+    const manualForm = screen.getByTestId("manual-external-time-form");
+    await user.selectOptions(within(manualForm).getByLabelText("Manual section"), "listening");
+    await user.clear(within(manualForm).getByLabelText("Manual minutes"));
+    await user.type(within(manualForm).getByLabelText("Manual minutes"), "45");
+    await user.click(within(manualForm).getByRole("button", { name: /record external time/i }));
+
+    expect(screen.queryByText("Listening 0/45 min")).not.toBeInTheDocument();
+    expect(screen.getByText("Speaking 0/30 min")).toBeVisible();
   });
 });
