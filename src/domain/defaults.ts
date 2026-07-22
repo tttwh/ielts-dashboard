@@ -1,3 +1,4 @@
+import type { AppState } from "../services/storage/storageTypes";
 import type { Achievement, DailyGoals, IeltsSection, SectionTargets, UserProfile } from "./types";
 
 export const IELTS_SECTIONS: readonly IeltsSection[] = [
@@ -71,4 +72,15 @@ export function createInitialAchievements(): Achievement[] {
       unlockedAt: null
     }
   ];
+}
+
+export function createDefaultAppState(now: string): AppState {
+  return {
+    schemaVersion: 1,
+    profile: createDefaultProfile(now),
+    dailyGoals: createDefaultDailyGoals(),
+    records: [],
+    timerSessions: [],
+    achievements: createInitialAchievements()
+  };
 }
