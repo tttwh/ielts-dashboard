@@ -70,3 +70,25 @@
 - `npm run test:e2e`
   - Passed in the empty scaffold state and exited cleanly with:
     - `No Playwright specs found; skipping e2e run.`
+
+## Task 1 Re-review Fix
+
+- Investigated the blocked re-review by reproducing `npm run test:e2e` with real scaffold smoke specs present.
+- Confirmed the root cause was not the wrapper script waiting on Playwright output; the direct Playwright CLI also hung after both desktop and mobile tests passed.
+- Moved dev-server lifecycle management out of Playwright `webServer` and into `scripts/test-e2e.mjs`, so the wrapper now starts Vite explicitly, waits for readiness, runs Playwright, and forcefully tears the server down on Windows and POSIX.
+- Kept the scaffold e2e scope unchanged: one smoke spec that verifies the placeholder app loads and does not introduce horizontal overflow, exercised by both `chromium-desktop` and `chromium-mobile`.
+- Updated `playwright.config.ts` to consume `PLAYWRIGHT_TEST_BASE_URL` instead of owning server startup, which keeps the configuration portable while avoiding the Windows shutdown hang.
+- Expanded `.gitignore` to cover the required generated artifacts and machine noise: `node_modules`, `dist`, `.npm-cache`, `tsconfig*.tsbuildinfo`, Playwright reports/results, logs, and OS junk.
+
+## Re-review Verification
+
+- `npm install`
+  - Passed.
+- `npm run build`
+  - Passed.
+- `npm run test`
+  - Passed with no unit specs present.
+- `npm run test:e2e`
+  - Passed and exited with code 0 after running both projects:
+    - `chromium-desktop`
+    - `chromium-mobile`

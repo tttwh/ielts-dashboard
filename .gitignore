@@ -1,0 +1,21 @@
+node_modules/
+dist/
+.npm-cache/
+tsconfig*.tsbuildinfo
+*.tsbuildinfo
+playwright-report/
+test-results/
+coverage/
+logs/
+*.log
+yarn-error.log*
+npm-debug.log*
+
+# OS junk
+.DS_Store
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.Spotlight-V100/
+.Trashes/
+._*

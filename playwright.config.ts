@@ -1,17 +1,23 @@
 import { defineConfig } from "@playwright/test";
 
+declare const process: {
+  env: {
+    PLAYWRIGHT_TEST_BASE_URL?: string;
+    PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH?: string;
+  };
+};
+
+const baseURL = process.env.PLAYWRIGHT_TEST_BASE_URL ?? "http://127.0.0.1:4173";
+const chromiumExecutablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
+const launchOptions = chromiumExecutablePath ? { executablePath: chromiumExecutablePath } : undefined;
+
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: true,
   reporter: "list",
   use: {
-    baseURL: "http://127.0.0.1:5173"
-  },
-  webServer: {
-    command: "node ./node_modules/vite/bin/vite.js --host 127.0.0.1",
-    url: "http://127.0.0.1:5173",
-    reuseExistingServer: true,
-    timeout: 120000
+    baseURL,
+    launchOptions
   },
   projects: [
     {
