@@ -1,9 +1,52 @@
+import { AppShell } from "./components/layout/AppShell";
+import { SummaryHeader } from "./components/summary/SummaryHeader";
+import type { DailyRecord } from "./domain/types";
+import { calculateDailyCompletion, calculateStreak } from "./domain/progress";
+import { useDashboardData } from "./hooks/useDashboardData";
+
+const activeRecordXp = (records: DailyRecord[]) =>
+  records
+    .filter((record) => record.deletedAt === null)
+    .reduce((total, record) => total + record.xpEarned, 0);
+
+const calculateLevel = (xp: number) => Math.max(1, Math.floor(Math.max(0, xp) / 100) + 1);
+
 export default function App() {
+  const { state, todayRecord } = useDashboardData();
+  const summary = calculateDailyCompletion(todayRecord, state.dailyGoals);
+  const streakDays = calculateStreak(state.records, todayRecord.date);
+  const xp = activeRecordXp(state.records);
+  const level = calculateLevel(xp);
+
   return (
-    <main className="min-h-screen bg-surface text-ink">
-      <div className="mx-auto max-w-7xl px-4 py-6">
-        <h1 className="text-xl font-semibold">IELTS Prep Dashboard</h1>
-      </div>
-    </main>
+    <AppShell
+      sidebar={
+        <section className="rounded-[8px] border border-line bg-white p-4 shadow-sm">
+          <h2 className="text-sm font-semibold text-ink">Compact Rail</h2>
+          <div className="mt-3 space-y-2" aria-hidden="true">
+            <div className="h-3 w-3/4 rounded-[4px] bg-soft-line" />
+            <div className="h-3 w-1/2 rounded-[4px] bg-soft-line" />
+            <div className="h-12 rounded-[6px] bg-surface" />
+          </div>
+        </section>
+      }
+      summary={
+        <SummaryHeader
+          level={level}
+          state={state}
+          streakDays={streakDays}
+          summary={summary}
+          xp={xp}
+        />
+      }
+    >
+      <section className="rounded-[8px] border border-line bg-white p-4 shadow-sm">
+        <h2 className="text-sm font-semibold text-ink">Daily Workspace</h2>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2" aria-hidden="true">
+          <div className="h-24 rounded-[6px] bg-surface" />
+          <div className="h-24 rounded-[6px] bg-surface" />
+        </div>
+      </section>
+    </AppShell>
   );
 }
