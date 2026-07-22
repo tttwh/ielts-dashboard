@@ -91,3 +91,64 @@ test("mobile viewport has no horizontal body overflow", async ({ page }) => {
 
   await expectNoHorizontalBodyOverflow(page);
 });
+
+test("accessibility contract covers scope copy, labels, heatmap, and timer keyboard controls", async ({
+  page
+}) => {
+  await loadDashboard(page);
+
+  await expect(page.getByText("Local mode · cloud-ready schema")).toBeVisible();
+  await expect(page.getByText(/cloud sync|syncing|synced|online sync|server sync/i)).toHaveCount(0);
+
+  const unlabeledControls = await page.evaluate(() => {
+    const unlabeledButtons = [...document.querySelectorAll("button")].filter(
+      (button) => !button.textContent?.trim() && !button.getAttribute("aria-label")
+    ).length;
+    const unlabeledInputs = [...document.querySelectorAll("input, select, textarea")].filter(
+      (control) => {
+        const id = control.getAttribute("id");
+        const hasLabel = id
+          ? Boolean(document.querySelector(`label[for='${CSS.escape(id)}']`))
+          : Boolean(control.closest("label"));
+        return (
+          !hasLabel &&
+          !control.getAttribute("aria-label") &&
+          !control.getAttribute("aria-labelledby")
+        );
+      }
+    ).length;
+
+    return unlabeledButtons + unlabeledInputs;
+  });
+
+  expect(unlabeledControls).toBe(0);
+  await expect(
+    page.getByTestId("history-heatmap").getByRole("button", {
+      name: "2026-07-22, 0% complete"
+    })
+  ).toBeVisible();
+
+  const timerPanel = page.getByTestId("study-timer-panel");
+  const startButton = timerPanel.getByRole("button", { name: /start/i });
+  await startButton.focus();
+  await expect(startButton).toBeFocused();
+  await page.keyboard.press("Enter");
+  await page.clock.fastForward("00:00:10");
+
+  const pauseButton = timerPanel.getByRole("button", { name: /pause/i });
+  await pauseButton.focus();
+  await expect(pauseButton).toBeFocused();
+  await page.keyboard.press(" ");
+
+  const resumeButton = timerPanel.getByRole("button", { name: /resume/i });
+  await resumeButton.focus();
+  await expect(resumeButton).toBeFocused();
+  await page.keyboard.press("Enter");
+
+  const finishButton = timerPanel.getByRole("button", { name: /end and record/i });
+  await finishButton.focus();
+  await expect(finishButton).toBeFocused();
+  await page.keyboard.press("Enter");
+
+  await expect(page.getByTestId("checkin-study-time-status")).toContainText("Reading 1/60 min");
+});

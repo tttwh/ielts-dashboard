@@ -11,6 +11,10 @@ logs/
 yarn-error.log*
 npm-debug.log*
 
+# Internal SDD handoff artifacts
+.superpowers/sdd/task-*-brief.md
+.superpowers/sdd/review-task-*.diff
+
 # OS junk
 .DS_Store
 Thumbs.db
