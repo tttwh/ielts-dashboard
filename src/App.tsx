@@ -1,4 +1,5 @@
 import { AppShell } from "./components/layout/AppShell";
+import { DailyCheckIn } from "./components/checkin/DailyCheckIn";
 import { SummaryHeader } from "./components/summary/SummaryHeader";
 import { TargetDashboard } from "./components/targets/TargetDashboard";
 import type { DailyRecord } from "./domain/types";
@@ -13,7 +14,8 @@ const activeRecordXp = (records: DailyRecord[]) =>
 const calculateLevel = (xp: number) => Math.max(1, Math.floor(Math.max(0, xp) / 100) + 1);
 
 export default function App() {
-  const { state, todayRecord, updateDailyGoals, updateProfile } = useDashboardData();
+  const { state, todayRecord, updateDailyGoals, updateProfile, updateTodayRecord } =
+    useDashboardData();
   const summary = calculateDailyCompletion(todayRecord, state.dailyGoals);
   const streakDays = calculateStreak(state.records, todayRecord.date);
   const xp = activeRecordXp(state.records);
@@ -41,6 +43,11 @@ export default function App() {
         />
       }
     >
+      <DailyCheckIn
+        dailyGoals={state.dailyGoals}
+        todayRecord={todayRecord}
+        updateTodayRecord={updateTodayRecord}
+      />
       <TargetDashboard
         dailyGoals={state.dailyGoals}
         profile={state.profile}

@@ -46,3 +46,138 @@
     font: inherit;
   }
 }
+
+@layer components {
+  .checkin-task-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 2rem;
+    gap: 0.75rem;
+    align-items: center;
+    min-width: 0;
+    padding: 0.75rem 1rem;
+  }
+
+  .checkin-task-input {
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+
+  .checkin-task-target,
+  .checkin-task-progress {
+    display: flex;
+    min-width: 0;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+    border-radius: 6px;
+    background: var(--color-surface);
+    padding: 0.45rem 0.55rem;
+  }
+
+  .checkin-task-target {
+    grid-column: 1;
+  }
+
+  .checkin-task-progress {
+    grid-column: 2;
+    justify-content: center;
+  }
+
+  .checkin-status-icon {
+    display: inline-grid;
+    grid-column: 2;
+    grid-row: 1;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border: 1px solid var(--color-line);
+    border-radius: 999px;
+    color: transparent;
+    background: #ffffff;
+    transition:
+      background-color 160ms ease,
+      border-color 160ms ease,
+      color 160ms ease,
+      transform 160ms ease;
+  }
+
+  .checkin-status-icon--complete {
+    border-color: #14b8a6;
+    color: #047857;
+    background: #ecfdf5;
+    animation: checkin-complete-pop 360ms ease-out;
+  }
+
+  .checkin-all-clear-badge {
+    display: inline-flex;
+    max-width: 100%;
+    align-items: center;
+    border: 1px solid #99f6e4;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #ecfdf5, #eff6ff, #faf5ff);
+    color: #047857;
+    padding: 0.125rem 0.55rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1.25rem;
+    animation: checkin-all-clear-pulse 1.8s ease-in-out 3;
+  }
+
+  @media (min-width: 640px) {
+    .checkin-task-row {
+      grid-template-columns:
+        minmax(8rem, 1fr)
+        minmax(9rem, 12rem)
+        minmax(5.5rem, auto)
+        minmax(4rem, auto)
+        2rem;
+    }
+
+    .checkin-task-input,
+    .checkin-task-target,
+    .checkin-task-progress,
+    .checkin-status-icon {
+      grid-column: auto;
+      grid-row: auto;
+    }
+
+    .checkin-task-target,
+    .checkin-task-progress {
+      justify-content: center;
+      white-space: nowrap;
+    }
+  }
+
+  @keyframes checkin-complete-pop {
+    0% {
+      transform: scale(0.82);
+    }
+
+    60% {
+      transform: scale(1.08);
+    }
+
+    100% {
+      transform: scale(1);
+    }
+  }
+
+  @keyframes checkin-all-clear-pulse {
+    0%,
+    100% {
+      border-color: #99f6e4;
+      box-shadow: 0 0 0 0 rgba(20, 184, 166, 0);
+    }
+
+    45% {
+      border-color: #93c5fd;
+      box-shadow:
+        0 0 0 3px rgba(20, 184, 166, 0.12),
+        0 0 0 6px rgba(109, 40, 217, 0.08);
+    }
+
+    70% {
+      border-color: #c4b5fd;
+    }
+  }
+}
