@@ -13,3 +13,4 @@ Task 8: complete (commits a5eeeea..53949ce, review clean; minor: exact timer ses
 Task 9: complete (commits 53e5686..4f8a836, review clean; minor: mobile e2e uses viewport sizing rather than full touch emulation)
 Task 10: complete (commits 63c6b90..dd5768c, review clean; minor: skill badge thresholds are permissive and unstated badge threshold tests could be broadened)
 Task 11: complete (commits a51dd38..e5a4348, review clean)
+Task 12: complete (commits 1d1e84d..d1f6745, review clean)
