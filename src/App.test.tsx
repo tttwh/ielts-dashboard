@@ -1,11 +1,16 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
+import { readState } from "./services/storage/localStorageAdapter";
 
 describe("App", () => {
   beforeEach(() => {
     localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   const setNumberField = (label: string, value: string) => {
@@ -125,5 +130,41 @@ describe("App", () => {
       "data-level",
       "1"
     );
+  });
+
+  it("records first post-midnight check-in and timer activity on the new local date", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 6, 22, 23, 59, 50));
+    render(<App />);
+
+    act(() => {
+      vi.advanceTimersByTime(11_000);
+    });
+
+    const manualForm = screen.getByTestId("manual-external-time-form");
+    fireEvent.change(within(manualForm).getByLabelText("Manual section"), {
+      target: { value: "listening" }
+    });
+    fireEvent.change(within(manualForm).getByLabelText("Manual minutes"), {
+      target: { value: "15" }
+    });
+    fireEvent.click(within(manualForm).getByRole("button", { name: /record external time/i }));
+    setNumberField("Words actual", "100");
+
+    const persistedState = readState();
+    expect(persistedState?.timerSessions).toEqual([
+      expect.objectContaining({
+        date: "2026-07-23",
+        section: "listening",
+        actualMinutes: 15
+      })
+    ]);
+    expect(persistedState?.records).toEqual([
+      expect.objectContaining({
+        date: "2026-07-23",
+        words: 100,
+        sectionMinutes: expect.objectContaining({ listening: 15 })
+      })
+    ]);
   });
 });

@@ -2,6 +2,10 @@ import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createDefaultAppState } from "../domain/defaults";
 import type { AppState } from "../services/storage/storageTypes";
+import {
+  createEmptyDailyRecord,
+  recalculateDailyRecordProgress
+} from "../domain/progress";
 import { createMemoryRepository } from "../services/storage/appRepository";
 import { useDashboardData } from "./useDashboardData";
 
@@ -134,6 +138,57 @@ describe("useDashboardData", () => {
     expect(result.current.todayRecord.completionRate).toBe(0.0625);
     expect(result.current.todayRecord.xpEarned).toBe(6);
     expect(repo.loadAppState().records[0].completionRate).toBe(0.0625);
+  });
+
+  it("preserves historical record progress when daily goals change", () => {
+    const state = createState();
+    const historicalRecord = recalculateDailyRecordProgress(
+      {
+        ...createEmptyDailyRecord(
+          "2026-07-21",
+          state.profile.userId,
+          "2026-07-21T00:00:00.000Z"
+        ),
+        words: 100,
+        speakingTopics: 3,
+        listeningTests: 1,
+        corpusMinutes: 30,
+        sectionMinutes: {
+          listening: 45,
+          speaking: 30,
+          reading: 60,
+          writing: 45
+        },
+        updatedAt: "2026-07-21T08:00:00.000Z",
+        syncStatus: "synced"
+      },
+      state.dailyGoals
+    );
+    const currentRecord = recalculateDailyRecordProgress(
+      {
+        ...createEmptyDailyRecord(today, state.profile.userId, "2026-07-22T00:00:00.000Z"),
+        words: 100
+      },
+      state.dailyGoals
+    );
+    const repo = createMemoryRepository({
+      ...state,
+      records: [historicalRecord, currentRecord]
+    });
+    const { result } = renderHook(() => useDashboardData(repo, today));
+
+    act(() => {
+      result.current.updateDailyGoals({ wordsTarget: 200 });
+    });
+
+    const records = repo.loadAppState().records;
+    expect(records.find((record) => record.date === "2026-07-21")).toEqual(historicalRecord);
+    expect(records.find((record) => record.date === today)).toMatchObject({
+      completionRate: 0.0625,
+      xpEarned: 6,
+      updatedAt: now,
+      syncStatus: "local-only"
+    });
   });
 
   it("evaluates and persists achievement unlocks after today's record changes", () => {

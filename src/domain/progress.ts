@@ -8,8 +8,18 @@ const clampProgress = (actual: number, target: number) => {
 
 const clampRate = (rate: number) => Math.min(Math.max(rate, 0), 1);
 
-const hasStudyProgress = (record: DailyRecord) =>
-  record.deletedAt === null && (record.completionRate > 0 || record.isAllClear);
+const hasAnySectionMinutes = (record: DailyRecord) =>
+  Object.values(record.sectionMinutes).some((minutes) => minutes > 0);
+
+export const hasDailyStudyActivity = (record: DailyRecord) =>
+  record.deletedAt === null &&
+  (record.completionRate > 0 ||
+    record.isAllClear ||
+    record.words > 0 ||
+    record.speakingTopics > 0 ||
+    record.listeningTests > 0 ||
+    record.corpusMinutes > 0 ||
+    hasAnySectionMinutes(record));
 
 export function calculateDailyCompletion(record: DailyRecord, goals: DailyGoals): CompletionSummary {
   const progressEntries: Array<[string, number | null]> = [
@@ -85,7 +95,7 @@ export function recalculateDailyRecordProgress(record: DailyRecord, goals: Daily
 }
 
 export function calculateStreak(records: DailyRecord[], today: string): number {
-  const studyDates = new Set(records.filter(hasStudyProgress).map((record) => record.date));
+  const studyDates = new Set(records.filter(hasDailyStudyActivity).map((record) => record.date));
   let streak = 0;
   let cursor = today;
 
@@ -95,6 +105,21 @@ export function calculateStreak(records: DailyRecord[], today: string): number {
   }
 
   return streak;
+}
+
+export function calculateLongestStreak(records: DailyRecord[]): number {
+  const studyDates = [...new Set(records.filter(hasDailyStudyActivity).map((record) => record.date))].sort();
+  let longestStreak = 0;
+  let currentStreak = 0;
+  let previousDate: string | null = null;
+
+  for (const date of studyDates) {
+    currentStreak = previousDate && date === addDays(previousDate, 1) ? currentStreak + 1 : 1;
+    longestStreak = Math.max(longestStreak, currentStreak);
+    previousDate = date;
+  }
+
+  return longestStreak;
 }
 
 export function buildHeatmapDays(records: DailyRecord[], today: string, days: number): HeatmapDay[] {

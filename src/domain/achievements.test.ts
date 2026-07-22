@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { addDays } from "../lib/date";
 import { evaluateAchievements } from "./achievements";
 import type { Achievement, DailyRecord, SectionMinutes } from "./types";
 
@@ -69,6 +70,15 @@ const buildConsecutiveStudyRecords = (count: number) =>
       date: `2026-07-${String(22 - index).padStart(2, "0")}`,
       completionRate: 0.2,
       xpEarned: 20
+    })
+  );
+
+const buildConsecutiveStudyRecordsEndingOn = (date: string, count: number) =>
+  Array.from({ length: count }, (_, index) =>
+    createRecord({
+      recordId: `record-${date}-${index}`,
+      date: addDays(date, -index),
+      words: 1
     })
   );
 
@@ -146,6 +156,20 @@ describe("evaluateAchievements", () => {
     });
 
     expect(findByName(achievements, "7-Day Streak")?.unlockedAt).toBe(now);
+  });
+
+  it("unlocks streak badges from the longest historical run even when it does not end today", () => {
+    const achievements = evaluateAchievements({
+      records: buildConsecutiveStudyRecordsEndingOn("2026-07-15", 14),
+      timerSessions: [],
+      achievements: [],
+      now,
+      today,
+      userId: "local-user"
+    });
+
+    expect(findByName(achievements, "7-Day Streak")?.unlockedAt).toBe(now);
+    expect(findByName(achievements, "14-Day Streak")?.unlockedAt).toBe(now);
   });
 
   it("never resets an existing unlockedAt on later evaluations", () => {

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildHeatmapDays,
   calculateDailyCompletion,
+  calculateLongestStreak,
   calculateStreak,
   calculateXp
 } from "./progress";
@@ -92,6 +93,49 @@ describe("calculateStreak", () => {
     ];
 
     expect(calculateStreak(records, "2026-07-22")).toBe(3);
+  });
+
+  it("counts raw study activity even when completion fields are zero", () => {
+    const inactiveRecord = {
+      ...baseRecord,
+      words: 0,
+      speakingTopics: 0,
+      listeningTests: 0,
+      corpusMinutes: 0,
+      sectionMinutes: {
+        listening: 0,
+        speaking: 0,
+        reading: 0,
+        writing: 0
+      },
+      completionRate: 0,
+      isAllClear: false,
+      xpEarned: 0
+    };
+    const records: DailyRecord[] = [
+      { ...inactiveRecord, recordId: "record-1", date: "2026-07-20", words: 20 },
+      {
+        ...inactiveRecord,
+        recordId: "record-2",
+        date: "2026-07-21",
+        sectionMinutes: { ...inactiveRecord.sectionMinutes, reading: 15 }
+      },
+      { ...inactiveRecord, recordId: "record-3", date: "2026-07-22", corpusMinutes: 10 }
+    ];
+
+    expect(calculateStreak(records, "2026-07-22")).toBe(3);
+  });
+
+  it("returns the longest consecutive raw activity run across history", () => {
+    const records: DailyRecord[] = [
+      { ...baseRecord, recordId: "record-1", date: "2026-07-01", completionRate: 0.2 },
+      { ...baseRecord, recordId: "record-2", date: "2026-07-02", completionRate: 0.2 },
+      { ...baseRecord, recordId: "record-3", date: "2026-07-04", completionRate: 0.2 },
+      { ...baseRecord, recordId: "record-4", date: "2026-07-05", completionRate: 0.2 },
+      { ...baseRecord, recordId: "record-5", date: "2026-07-06", completionRate: 0.2 }
+    ];
+
+    expect(calculateLongestStreak(records)).toBe(3);
   });
 });
 

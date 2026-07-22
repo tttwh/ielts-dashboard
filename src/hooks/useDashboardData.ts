@@ -238,7 +238,7 @@ export function useDashboardData(
           syncStatus: "local-only"
         };
         const records = current.records.map((record) => {
-          if (record.deletedAt !== null) return record;
+          if (record.deletedAt !== null || record.date !== today) return record;
 
           const recalculated = recalculateDailyRecordProgress(record, dailyGoals);
           const progressChanged =

@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => {
     studyTimerProps: vi.fn(),
     summaryHeaderProps: vi.fn(),
     targetDashboardProps: vi.fn(),
+    useCurrentDateKey: vi.fn(() => "2026-07-22"),
     useDashboardData: vi.fn()
   };
 });
@@ -30,6 +31,10 @@ vi.mock("./services/storage/appRepository", () => ({
 
 vi.mock("./hooks/useDashboardData", () => ({
   useDashboardData: mocks.useDashboardData
+}));
+
+vi.mock("./hooks/useCurrentDateKey", () => ({
+  useCurrentDateKey: mocks.useCurrentDateKey
 }));
 
 vi.mock("./components/layout/AppShell", () => ({
@@ -138,7 +143,8 @@ describe("App composition", () => {
 
     expect(mocks.createLocalStorageRepository).toHaveBeenCalledTimes(1);
     expect(mocks.useDashboardData).toHaveBeenCalledWith(
-      mocks.fakeRepository satisfies AppRepository
+      mocks.fakeRepository satisfies AppRepository,
+      "2026-07-22"
     );
     expect(mocks.appShellProps).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -168,12 +174,12 @@ describe("App composition", () => {
     expect(mocks.studyTimerProps).toHaveBeenCalledWith({
       addTimerSession,
       dailyGoals: state.dailyGoals,
-      today: todayRecord.date,
+      today: "2026-07-22",
       userId: state.profile.userId
     });
     expect(mocks.heatmapProps).toHaveBeenCalledWith({
       records: state.records,
-      today: todayRecord.date
+      today: "2026-07-22"
     });
     expect(mocks.rewardsProps).toHaveBeenCalledWith({
       achievements: state.achievements,

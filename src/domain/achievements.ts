@@ -1,4 +1,4 @@
-import { calculateStreak } from "./progress";
+import { calculateLongestStreak, hasDailyStudyActivity } from "./progress";
 import type { Achievement, DailyRecord, TimerSession } from "./types";
 
 type AchievementRule = (input: RuleInput) => boolean;
@@ -27,18 +27,6 @@ export interface AchievementEvaluationInput {
   userId?: string;
 }
 
-const hasAnySectionMinutes = (record: DailyRecord) =>
-  Object.values(record.sectionMinutes).some((minutes) => minutes > 0);
-
-const hasStudyProgress = (record: DailyRecord) =>
-  record.completionRate > 0 ||
-  record.isAllClear ||
-  record.words > 0 ||
-  record.speakingTopics > 0 ||
-  record.listeningTests > 0 ||
-  record.corpusMinutes > 0 ||
-  hasAnySectionMinutes(record);
-
 const hasBalancedSectionMinutes = (record: DailyRecord) =>
   Object.values(record.sectionMinutes).every((minutes) => minutes > 0);
 
@@ -46,7 +34,7 @@ const studyDates = (records: DailyRecord[], timerSessions: TimerSession[]) => {
   const dates = new Set<string>();
 
   records.forEach((record) => {
-    if (hasStudyProgress(record)) {
+    if (hasDailyStudyActivity(record)) {
       dates.add(record.date);
     }
   });
@@ -61,7 +49,7 @@ const studyDates = (records: DailyRecord[], timerSessions: TimerSession[]) => {
 
 const latestRecordDate = (records: DailyRecord[]) =>
   records.reduce<string | null>((latestDate, record) => {
-    if (!hasStudyProgress(record)) return latestDate;
+    if (!hasDailyStudyActivity(record)) return latestDate;
     return latestDate === null || record.date > latestDate ? record.date : latestDate;
   }, null);
 
@@ -69,9 +57,9 @@ const definitions: readonly AchievementDefinition[] = [
   {
     achievementId: "first-check-in",
     name: "First Check-in",
-    description: "Record any daily completion progress above 0.",
+    description: "Record any daily study activity.",
     category: "milestone",
-    rule: ({ records }) => records.some((record) => record.completionRate > 0)
+    rule: ({ records }) => records.some(hasDailyStudyActivity)
   },
   {
     achievementId: "all-clear",
@@ -86,14 +74,14 @@ const definitions: readonly AchievementDefinition[] = [
     name: "7-Day Streak",
     description: "Record study progress for seven consecutive days.",
     category: "streak",
-    rule: ({ records, today }) => calculateStreak(records, today) >= 7
+    rule: ({ records }) => calculateLongestStreak(records) >= 7
   },
   {
     achievementId: "fourteen-day-streak",
     name: "14-Day Streak",
     description: "Record study progress for fourteen consecutive days.",
     category: "streak",
-    rule: ({ records, today }) => calculateStreak(records, today) >= 14
+    rule: ({ records }) => calculateLongestStreak(records) >= 14
   },
   {
     achievementId: "reading-discipline",
