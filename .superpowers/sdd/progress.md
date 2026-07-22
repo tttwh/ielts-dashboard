@@ -7,3 +7,4 @@ Task 2: complete (commits 81cf4d3..62140bc, review clean; minor: heatmap/date/fo
 Task 3: complete (commits 4c28665..d86a0a9, review clean; minor: validator enum constants could be centralized later)
 Task 4: complete (commits f2779bf..b184c2b, review clean; minor: timer metadata tests could be broadened later)
 Task 5: complete (commits 151de2c..a071e21, review clean; minor: report uses npm.cmd wording for Windows verification)
+Task 6: complete (commits ab8fde6..ba82eb2, review clean)
