@@ -14,3 +14,4 @@ Task 9: complete (commits 53e5686..4f8a836, review clean; minor: mobile e2e uses
 Task 10: complete (commits 63c6b90..dd5768c, review clean; minor: skill badge thresholds are permissive and unstated badge threshold tests could be broadened)
 Task 11: complete (commits a51dd38..e5a4348, review clean)
 Task 12: complete (commits 1d1e84d..d1f6745, review clean)
+Task 13: complete (commits bcdd059..b02ee5c, review clean; minor: keyboard reachability e2e could use real Tab order instead of programmatic focus)
