@@ -51,3 +51,22 @@
 
 - `npm run test:e2e` is configured, but no Playwright spec files exist yet. That is expected for Task 1 and will be handled in later tasks.
 - `npm install` needed a workspace-local cache because the default npm cache location on this machine hit a permission error.
+
+## Task 1 Review Fixes
+
+- Upgraded the Tailwind scaffold to v4-compatible setup by adding `@tailwindcss/vite`, switching `src/styles.css` to the CSS-first `@import "tailwindcss";` + `@theme` model, and removing the old Tailwind v3 PostCSS plugin wiring.
+- Added a repo-local `.npmrc` with `cache=.npm-cache` so a plain `npm install` uses a project-scoped cache and does not depend on the machine-wide npm cache path.
+- Split TypeScript config responsibilities into `tsconfig.app.json` for browser code and `tsconfig.node.json` for Vite/Playwright config files, with the root `tsconfig.json` acting as the solution entrypoint.
+- Made `npm run test:e2e` safe in the empty scaffold by routing it through `scripts/test-e2e.mjs`, which skips Playwright entirely until real `tests/e2e` specs exist.
+
+## Final Verification
+
+- `npm install`
+  - Succeeded with the repo-local cache config in place.
+- `npm run build`
+  - Passed.
+- `npm run test`
+  - Passed.
+- `npm run test:e2e`
+  - Passed in the empty scaffold state and exited cleanly with:
+    - `No Playwright specs found; skipping e2e run.`
