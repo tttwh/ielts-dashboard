@@ -1,5 +1,6 @@
 import { AppShell } from "./components/layout/AppShell";
 import { SummaryHeader } from "./components/summary/SummaryHeader";
+import { TargetDashboard } from "./components/targets/TargetDashboard";
 import type { DailyRecord } from "./domain/types";
 import { calculateDailyCompletion, calculateStreak } from "./domain/progress";
 import { useDashboardData } from "./hooks/useDashboardData";
@@ -12,7 +13,7 @@ const activeRecordXp = (records: DailyRecord[]) =>
 const calculateLevel = (xp: number) => Math.max(1, Math.floor(Math.max(0, xp) / 100) + 1);
 
 export default function App() {
-  const { state, todayRecord } = useDashboardData();
+  const { state, todayRecord, updateDailyGoals, updateProfile } = useDashboardData();
   const summary = calculateDailyCompletion(todayRecord, state.dailyGoals);
   const streakDays = calculateStreak(state.records, todayRecord.date);
   const xp = activeRecordXp(state.records);
@@ -40,13 +41,12 @@ export default function App() {
         />
       }
     >
-      <section className="rounded-[8px] border border-line bg-white p-4 shadow-sm">
-        <h2 className="text-sm font-semibold text-ink">Daily Workspace</h2>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2" aria-hidden="true">
-          <div className="h-24 rounded-[6px] bg-surface" />
-          <div className="h-24 rounded-[6px] bg-surface" />
-        </div>
-      </section>
+      <TargetDashboard
+        dailyGoals={state.dailyGoals}
+        profile={state.profile}
+        updateDailyGoals={updateDailyGoals}
+        updateProfile={updateProfile}
+      />
     </AppShell>
   );
 }
