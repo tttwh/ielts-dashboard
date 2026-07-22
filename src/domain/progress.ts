@@ -47,6 +47,43 @@ export function calculateDailyCompletion(record: DailyRecord, goals: DailyGoals)
   };
 }
 
+export function createEmptyDailyRecord(date: string, userId: string, now: string): DailyRecord {
+  return {
+    recordId: `record-${date}`,
+    userId,
+    date,
+    words: 0,
+    speakingTopics: 0,
+    listeningTests: 0,
+    corpusMinutes: 0,
+    sectionMinutes: {
+      listening: 0,
+      speaking: 0,
+      reading: 0,
+      writing: 0
+    },
+    readingOvertimeMinutes: 0,
+    completionRate: 0,
+    isAllClear: false,
+    xpEarned: 0,
+    createdAt: now,
+    updatedAt: now,
+    deletedAt: null,
+    syncStatus: "local-only"
+  };
+}
+
+export function recalculateDailyRecordProgress(record: DailyRecord, goals: DailyGoals): DailyRecord {
+  const summary = calculateDailyCompletion(record, goals);
+
+  return {
+    ...record,
+    completionRate: summary.completionRate,
+    isAllClear: summary.isAllClear,
+    xpEarned: calculateXp(summary.completionRate, summary.isAllClear, summary.isBalancedDay)
+  };
+}
+
 export function calculateStreak(records: DailyRecord[], today: string): number {
   const studyDates = new Set(records.filter(hasStudyProgress).map((record) => record.date));
   let streak = 0;

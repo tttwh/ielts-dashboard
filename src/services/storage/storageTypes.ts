@@ -19,3 +19,5 @@ export interface AppRepository {
   loadAppState(): AppState;
   saveAppState(state: AppState): void;
 }
+
+export type AppStateMutation = (state: AppState) => AppState;
