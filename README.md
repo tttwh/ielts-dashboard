@@ -1,6 +1,30 @@
-# IELTS Prep Dashboard
+<div align="center">
+  <h1>IELTS Prep Dashboard</h1>
+  <p><strong>A local-first dashboard for IELTS study tracking, check-ins, timers, and progress history.</strong></p>
+  <p>
+    <a href="#核心功能">Features</a> ·
+    <a href="#快速开始">Getting Started</a> ·
+    <a href="#技术栈">Tech Stack</a> ·
+    <a href="#数据存储说明">Data Storage</a> ·
+    <a href="#后续路线图">Roadmap</a> ·
+    <a href="#免责声明">Disclaimer</a>
+  </p>
+  <p>
+    <img alt="platform" src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-111827?style=flat-square">
+    <img alt="React" src="https://img.shields.io/badge/UI-React-2563EB?logo=react&logoColor=white&style=flat-square">
+    <img alt="TypeScript" src="https://img.shields.io/badge/code-TypeScript-3178C6?logo=typescript&logoColor=white&style=flat-square">
+    <img alt="Vite" src="https://img.shields.io/badge/build-Vite-646CFF?logo=vite&logoColor=white&style=flat-square">
+    <img alt="Tailwind CSS" src="https://img.shields.io/badge/style-Tailwind%20CSS-38BDF8?logo=tailwindcss&logoColor=white&style=flat-square">
+    <img alt="storage" src="https://img.shields.io/badge/storage-LocalStorage-6D28D9?style=flat-square">
+    <img alt="tests" src="https://img.shields.io/badge/tests-Vitest%20%2B%20Playwright-16A34A?style=flat-square">
+  </p>
+  <p>
+    <a href="#项目介绍">简体中文</a> |
+    <a href="#english-summary">English</a>
+  </p>
+</div>
 
-> A local-first IELTS preparation dashboard for goal tracking, daily check-ins, study timers, progress history, and lightweight rewards.
+---
 
 ## 项目介绍
 
