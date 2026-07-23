@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import { buildHeatmapDays } from "../../domain/progress";
 import type { DailyRecord, HeatmapDay } from "../../domain/types";
+import { useI18n } from "../../i18n/I18nProvider";
+import type { I18nText } from "../../i18n/translations";
 import { formatPercent } from "../../lib/format";
 
 interface Heatmap60Props {
@@ -23,7 +25,8 @@ const levelClasses: Record<HeatmapDay["level"], string> = {
 
 const historyWindowDays = 60;
 
-const dayLabel = (day: HeatmapDay) => `${day.date}, ${formatPercent(day.completionRate)} complete`;
+const dayLabel = (day: HeatmapDay, t: I18nText) =>
+  t.history.dayLabel(day.date, formatPercent(day.completionRate));
 
 function HistoryMetric({ label, value }: HistoryMetricProps) {
   return (
@@ -35,6 +38,7 @@ function HistoryMetric({ label, value }: HistoryMetricProps) {
 }
 
 export function Heatmap60({ records, today }: Heatmap60Props) {
+  const { t } = useI18n();
   const days = useMemo(
     () => buildHeatmapDays(records, today, historyWindowDays),
     [records, today]
@@ -61,35 +65,35 @@ export function Heatmap60({ records, today }: Heatmap60Props) {
       <div className="flex min-w-0 flex-col gap-3 border-b border-line p-4 md:flex-row md:items-end md:justify-between">
         <div className="min-w-0">
           <h2 id="history-summary-heading" className="text-base font-semibold leading-6 text-ink">
-            History Summary
+            {t.history.title}
           </h2>
-          <p className="mt-1 text-sm leading-5 text-muted">Latest 60 local study days.</p>
+          <p className="mt-1 text-sm leading-5 text-muted">{t.history.description}</p>
         </div>
         <div className="grid min-w-0 grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
-          <HistoryMetric label="Active" value={`${activeDays}/60`} />
-          <HistoryMetric label="Average" value={formatPercent(averageCompletion)} />
-          <HistoryMetric label="Best" value={formatPercent(bestCompletion)} />
-          <HistoryMetric label="100% days" value={`${allClearDays}`} />
+          <HistoryMetric label={t.history.active} value={`${activeDays}/60`} />
+          <HistoryMetric label={t.history.average} value={formatPercent(averageCompletion)} />
+          <HistoryMetric label={t.history.best} value={formatPercent(bestCompletion)} />
+          <HistoryMetric label={t.history.allClearDays} value={`${allClearDays}`} />
         </div>
       </div>
 
       <div className="min-w-0 p-4">
         <div
-          aria-label="60-day completion heatmap"
+          aria-label={t.history.heatmapLabel}
           className="min-w-0 overflow-x-auto overscroll-x-contain pb-1"
           data-testid="heatmap-strip"
         >
           <div className="grid min-w-max grid-flow-col grid-rows-7 gap-[3px] [grid-auto-columns:1rem]">
             {days.map((day) => (
               <button
-                aria-label={dayLabel(day)}
+                aria-label={dayLabel(day, t)}
                 className={`h-4 w-4 rounded-[3px] border transition-transform focus:outline-none focus:ring-2 focus:ring-ielts-blue focus:ring-offset-1 hover:scale-110 ${levelClasses[day.level]}`}
                 data-date={day.date}
                 data-level={day.level}
                 key={day.date}
                 onFocus={() => setActiveDate(day.date)}
                 onMouseEnter={() => setActiveDate(day.date)}
-                title={dayLabel(day)}
+                title={dayLabel(day, t)}
                 type="button"
               />
             ))}
@@ -102,10 +106,10 @@ export function Heatmap60({ records, today }: Heatmap60Props) {
             className="min-w-0 font-mono text-xs font-semibold text-ink"
             data-testid="heatmap-day-detail"
           >
-            {displayDay.date} - {formatPercent(displayDay.completionRate)} complete
+            {t.history.dayDetail(displayDay.date, formatPercent(displayDay.completionRate))}
           </p>
           <div
-            aria-label="Heatmap legend from 0 percent to 100 percent"
+            aria-label={t.history.legendLabel}
             className="flex shrink-0 items-center gap-1.5"
             data-testid="heatmap-legend"
           >

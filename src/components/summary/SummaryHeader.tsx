@@ -1,6 +1,8 @@
 import type { CompletionSummary } from "../../domain/types";
 import type { AppState } from "../../services/storage/storageTypes";
 import { formatBand, formatPercent } from "../../lib/format";
+import { useI18n } from "../../i18n/I18nProvider";
+import { LanguageToggle } from "../language/LanguageToggle";
 import { Badge } from "../ui/Badge";
 import { ProgressRing } from "../ui/ProgressRing";
 
@@ -37,8 +39,9 @@ function Metric({ label, value, tone = "neutral" }: MetricProps) {
 }
 
 export function SummaryHeader({ state, summary, streakDays, xp, level }: SummaryHeaderProps) {
+  const { t } = useI18n();
   const completionPercent = formatPercent(summary.completionRate);
-  const streakLabel = `${streakDays} ${streakDays === 1 ? "day" : "days"}`;
+  const streakLabel = t.summary.streakDays(streakDays);
 
   return (
     <section
@@ -47,21 +50,24 @@ export function SummaryHeader({ state, summary, streakDays, xp, level }: Summary
     >
       <div className="flex min-w-0 flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between">
         <div className="flex min-w-0 items-center gap-3">
-          <ProgressRing label="Today completion" value={summary.completionRate} />
+          <ProgressRing label={t.summary.todayCompletion} value={summary.completionRate} />
           <div className="min-w-0">
             <div className="mb-2 flex min-w-0 flex-wrap items-center gap-2">
-              <h1 className="text-xl font-semibold leading-7 text-ink">IELTS Prep Dashboard</h1>
-              <Badge tone="purple">Local mode · cloud-ready schema</Badge>
+              <h1 className="text-xl font-semibold leading-7 text-ink">
+                {t.summary.dashboardTitle}
+              </h1>
+              <Badge tone="purple">{t.summary.localMode}</Badge>
+              <LanguageToggle />
             </div>
           </div>
         </div>
 
         <div className="grid min-w-0 grid-cols-2 gap-x-3 gap-y-2 divide-line sm:grid-cols-3 lg:grid-cols-5 lg:divide-x">
-          <Metric label="Target band" value={formatBand(state.profile.targetBand)} tone="blue" />
-          <Metric label="Today completion" value={completionPercent} tone="purple" />
-          <Metric label="Streak" value={streakLabel} />
-          <Metric label="XP" value={`${xp} XP`} tone="blue" />
-          <Metric label="Level" value={`Level ${level}`} tone="purple" />
+          <Metric label={t.summary.targetBand} value={formatBand(state.profile.targetBand)} tone="blue" />
+          <Metric label={t.summary.todayCompletion} value={completionPercent} tone="purple" />
+          <Metric label={t.summary.streak} value={streakLabel} />
+          <Metric label={t.summary.xp} value={`${xp} ${t.units.xp}`} tone="blue" />
+          <Metric label={t.summary.levelLabel} value={t.summary.levelValue(level)} tone="purple" />
         </div>
       </div>
     </section>

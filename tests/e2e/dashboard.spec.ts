@@ -47,6 +47,30 @@ test("dashboard loads", async ({ page }) => {
   await expect(page.getByRole("region", { name: "Target dashboard" })).toBeVisible();
 });
 
+test("language toggle switches visible dashboard copy and survives reload", async ({ page }) => {
+  await loadDashboard(page);
+
+  await page.getByRole("button", { name: "中" }).click();
+
+  await expect(page.getByRole("heading", { name: "雅思备考打卡看板" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "每日打卡" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "学习计时器" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "目标看板" })).toBeVisible();
+  await expect(page.getByRole("progressbar", { name: "今日完成度" })).toHaveAttribute(
+    "aria-valuenow",
+    "0"
+  );
+  await expect(page.getByText("本地模式 · 已预留云同步结构")).toBeVisible();
+
+  await page.reload();
+
+  await expect(page.getByRole("heading", { name: "雅思备考打卡看板" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Eng" }).click();
+
+  await expect(page.getByRole("heading", { name: "IELTS Prep Dashboard" })).toBeVisible();
+});
+
 test("target score edit survives reload", async ({ page }) => {
   await loadDashboard(page);
 

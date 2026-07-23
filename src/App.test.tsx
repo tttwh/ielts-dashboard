@@ -48,6 +48,31 @@ describe("App", () => {
     expect(screen.getByRole("main")).toBeVisible();
   });
 
+  it("switches visible dashboard copy between Chinese and English and persists the choice", async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(<App />);
+
+    expect(screen.getByRole("heading", { name: "IELTS Prep Dashboard" })).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "中" }));
+
+    expect(screen.getByRole("heading", { name: "雅思备考打卡看板" })).toBeVisible();
+    expect(screen.getByRole("region", { name: "每日打卡" })).toBeVisible();
+    expect(screen.getByRole("region", { name: "学习计时器" })).toBeVisible();
+    expect(screen.getByRole("region", { name: "目标看板" })).toBeVisible();
+    expect(document.documentElement).toHaveAttribute("lang", "zh-CN");
+
+    unmount();
+    render(<App />);
+
+    expect(screen.getByRole("heading", { name: "雅思备考打卡看板" })).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "Eng" }));
+
+    expect(screen.getByRole("heading", { name: "IELTS Prep Dashboard" })).toBeVisible();
+    expect(document.documentElement).toHaveAttribute("lang", "en");
+  });
+
   it("updates today's check-in values until All Clear appears", () => {
     render(<App />);
 

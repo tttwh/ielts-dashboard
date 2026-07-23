@@ -1,7 +1,8 @@
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { createDefaultAppState } from "../../domain/defaults";
 import type { CompletionSummary } from "../../domain/types";
+import { renderWithI18n } from "../../test/renderWithI18n";
 import { SummaryHeader } from "./SummaryHeader";
 
 const summary: CompletionSummary = {
@@ -16,7 +17,7 @@ describe("SummaryHeader", () => {
   it("renders IELTS target, completion, streak, XP, level, and local schema status", () => {
     const state = createDefaultAppState("2026-07-22T00:00:00.000Z");
 
-    render(
+    renderWithI18n(
       <SummaryHeader
         level={3}
         state={{ ...state, profile: { ...state.profile, targetBand: 7.5 } }}

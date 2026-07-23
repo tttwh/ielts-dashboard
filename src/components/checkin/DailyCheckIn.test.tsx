@@ -1,8 +1,9 @@
-import { render, screen, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { createDefaultDailyGoals } from "../../domain/defaults";
 import { createEmptyDailyRecord } from "../../domain/progress";
+import { renderWithI18n } from "../../test/renderWithI18n";
 import { DailyCheckIn } from "./DailyCheckIn";
 
 const now = "2026-07-22T00:00:00.000Z";
@@ -12,7 +13,7 @@ const createRecord = () => createEmptyDailyRecord("2026-07-22", "local-user", no
 
 describe("DailyCheckIn", () => {
   it("shows task actuals, targets, progress, and completion states", () => {
-    render(
+    renderWithI18n(
       <DailyCheckIn
         dailyGoals={goals}
         todayRecord={{
@@ -45,7 +46,7 @@ describe("DailyCheckIn", () => {
   });
 
   it("surfaces pending study-time targets that also gate All Clear", () => {
-    render(
+    renderWithI18n(
       <DailyCheckIn
         dailyGoals={goals}
         todayRecord={{
@@ -88,7 +89,7 @@ describe("DailyCheckIn", () => {
       }
     };
 
-    const { rerender } = render(
+    const { rerender } = renderWithI18n(
       <DailyCheckIn
         dailyGoals={sectionTargetsOff}
         todayRecord={createRecord()}
@@ -110,7 +111,7 @@ describe("DailyCheckIn", () => {
   });
 
   it("announces zero-target rows as off instead of incomplete", () => {
-    render(
+    renderWithI18n(
       <DailyCheckIn
         dailyGoals={{ ...goals, wordsTarget: 0 }}
         todayRecord={createRecord()}
@@ -128,7 +129,7 @@ describe("DailyCheckIn", () => {
     const user = userEvent.setup();
     const updateTodayRecord = vi.fn();
 
-    render(
+    renderWithI18n(
       <DailyCheckIn
         dailyGoals={goals}
         todayRecord={createRecord()}
@@ -154,7 +155,7 @@ describe("DailyCheckIn", () => {
   });
 
   it("shows a pulsing All Clear badge only from the record state", () => {
-    render(
+    renderWithI18n(
       <DailyCheckIn
         dailyGoals={goals}
         todayRecord={{ ...createRecord(), isAllClear: true }}

@@ -1,7 +1,8 @@
 import { Check } from "lucide-react";
-import { IELTS_SECTIONS, SECTION_LABELS } from "../../domain/defaults";
+import { IELTS_SECTIONS } from "../../domain/defaults";
 import type { DailyGoals, DailyRecord } from "../../domain/types";
 import type { DailyRecordUpdate } from "../../hooks/useDashboardData";
+import { useI18n } from "../../i18n/I18nProvider";
 import { NumberField } from "../ui/NumberField";
 
 type TaskField = "words" | "speakingTopics" | "listeningTests" | "corpusMinutes";
@@ -41,54 +42,50 @@ const rowProgress = (actual: number, target: number) => {
   return Math.min(Math.max(actual, 0) / target, 1);
 };
 
-const progressLabel = (progress: number | null) =>
-  progress === null ? "Off" : `${Math.round(progress * 100)}%`;
-
-const statusLabel = (label: string, progress: number | null) => {
-  if (progress === null) return `${label} off`;
-  return `${label} ${progress >= 1 ? "complete" : "incomplete"}`;
-};
+const progressLabel = (progress: number | null, offLabel: string) =>
+  progress === null ? offLabel : `${Math.round(progress * 100)}%`;
 
 export function DailyCheckIn({
   dailyGoals,
   todayRecord,
   updateTodayRecord
 }: DailyCheckInProps) {
+  const { t } = useI18n();
   const tasks: CheckInTask[] = [
     {
       id: "words",
       field: "words",
-      label: "Words",
+      label: t.checkIn.taskLabels.words,
       actual: todayRecord.words,
       target: dailyGoals.wordsTarget,
-      suffix: "words",
+      suffix: t.units.words,
       max: 9999
     },
     {
       id: "speaking-topics",
       field: "speakingTopics",
-      label: "Speaking topics",
+      label: t.checkIn.taskLabels.speakingTopics,
       actual: todayRecord.speakingTopics,
       target: dailyGoals.speakingTopicsTarget,
-      suffix: "topics",
+      suffix: t.units.topics,
       max: 99
     },
     {
       id: "listening-tests",
       field: "listeningTests",
-      label: "Listening tests",
+      label: t.checkIn.taskLabels.listeningTests,
       actual: todayRecord.listeningTests,
       target: dailyGoals.listeningTestsTarget,
-      suffix: "tests",
+      suffix: t.units.tests,
       max: 99
     },
     {
       id: "corpus-minutes",
       field: "corpusMinutes",
-      label: "Corpus minutes",
+      label: t.checkIn.taskLabels.corpusMinutes,
       actual: todayRecord.corpusMinutes,
       target: dailyGoals.corpusMinutesTarget,
-      suffix: "min",
+      suffix: t.units.minutesShort,
       max: 1440
     }
   ];
@@ -101,7 +98,7 @@ export function DailyCheckIn({
     return [
       {
         id: section,
-        label: SECTION_LABELS[section],
+        label: t.sections[section],
         actual,
         target
       }
@@ -110,15 +107,15 @@ export function DailyCheckIn({
 
   return (
     <section
-      aria-label="Daily Check-In"
+      aria-label={t.checkIn.regionLabel}
       className="min-w-0 rounded-[8px] border border-line bg-white shadow-sm"
       data-testid="daily-checkin"
     >
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 border-b border-line p-4">
-        <h2 className="text-base font-semibold leading-6 text-ink">Daily Check-In</h2>
+        <h2 className="text-base font-semibold leading-6 text-ink">{t.checkIn.title}</h2>
         {todayRecord.isAllClear ? (
           <span className="checkin-all-clear-badge" aria-live="polite">
-            All Clear
+            {t.checkIn.allClear}
           </span>
         ) : null}
       </div>
@@ -127,7 +124,8 @@ export function DailyCheckIn({
         {tasks.map((task) => {
           const progress = rowProgress(task.actual, task.target);
           const isComplete = progress !== null && progress >= 1;
-          const taskStatusLabel = statusLabel(task.label, progress);
+          const taskStatus = progress === null ? "off" : isComplete ? "complete" : "incomplete";
+          const taskStatusLabel = t.checkIn.statusLabel(task.label, taskStatus);
 
           return (
             <div
@@ -141,7 +139,7 @@ export function DailyCheckIn({
 
               <div className="checkin-task-input min-w-0">
                 <NumberField
-                  label={`${task.label} actual`}
+                  label={t.checkIn.actualLabel(task.label)}
                   max={task.max}
                   min={0}
                   onChange={(value) => updateTodayRecord(taskUpdateFactories[task.field](value))}
@@ -152,13 +150,15 @@ export function DailyCheckIn({
               </div>
 
               <div className="checkin-task-target">
-                <span className="text-xs font-medium uppercase tracking-normal text-muted">Target</span>
+                <span className="text-xs font-medium uppercase tracking-normal text-muted">
+                  {t.checkIn.target}
+                </span>
                 <span className="font-mono text-sm font-semibold text-ink">{task.target}</span>
               </div>
 
               <div className="checkin-task-progress">
                 <span className="font-mono text-sm font-semibold text-ielts-purple">
-                  {progressLabel(progress)}
+                  {progressLabel(progress, t.checkIn.off)}
                 </span>
               </div>
 
@@ -179,12 +179,12 @@ export function DailyCheckIn({
             data-testid="checkin-study-time-status"
           >
             <span className="text-xs font-semibold uppercase tracking-normal text-muted">
-              Study time targets pending
+              {t.checkIn.studyTimePending}
             </span>
-            <div className="checkin-study-time-summary" aria-label="Pending study time progress">
+            <div className="checkin-study-time-summary" aria-label={t.checkIn.pendingStudyTimeProgress}>
               {pendingSectionProgress.map((section) => (
                 <span key={section.id}>
-                  {section.label} {section.actual}/{section.target} min
+                  {section.label} {section.actual}/{section.target} {t.units.minutesShort}
                 </span>
               ))}
             </div>

@@ -1,6 +1,7 @@
 import type { DailyGoals, UserProfile } from "../../domain/types";
-import { IELTS_SECTIONS, SECTION_LABELS } from "../../domain/defaults";
+import { IELTS_SECTIONS } from "../../domain/defaults";
 import type { DailyGoalsUpdate, ProfileUpdate } from "../../hooks/useDashboardData";
+import { useI18n } from "../../i18n/I18nProvider";
 import { NumberField } from "../ui/NumberField";
 
 interface TargetDashboardProps {
@@ -16,44 +17,46 @@ export function TargetDashboard({
   updateProfile,
   updateDailyGoals
 }: TargetDashboardProps) {
+  const { t } = useI18n();
+
   return (
     <section
-      aria-label="Target dashboard"
+      aria-label={t.targets.regionLabel}
       className="min-w-0 rounded-[8px] border border-line bg-white shadow-sm"
       data-testid="target-dashboard"
     >
       <div className="flex min-w-0 flex-col gap-2 border-b border-line p-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
-          <h2 className="text-base font-semibold leading-6 text-ink">Target Dashboard</h2>
-          <p className="mt-1 text-sm leading-5 text-muted">Band targets and daily practice load.</p>
+          <h2 className="text-base font-semibold leading-6 text-ink">{t.targets.title}</h2>
+          <p className="mt-1 text-sm leading-5 text-muted">{t.targets.description}</p>
         </div>
         <p className="font-mono text-xs font-semibold uppercase tracking-normal text-ielts-purple">
-          Local auto-save
+          {t.targets.localAutoSave}
         </p>
       </div>
 
       <div className="grid min-w-0 gap-5 p-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
         <fieldset className="min-w-0">
-          <legend className="text-sm font-semibold text-ink">Score Targets</legend>
+          <legend className="text-sm font-semibold text-ink">{t.targets.scoreTargets}</legend>
           <div className="mt-3 grid min-w-0 grid-cols-2 gap-3 sm:grid-cols-3">
             <NumberField
-              label="Total band"
+              label={t.targets.totalBand}
               max={9}
               min={0}
               onChange={(targetBand) => updateProfile({ targetBand })}
               step={0.5}
-              suffix="band"
+              suffix={t.units.band}
               value={profile.targetBand}
             />
             {IELTS_SECTIONS.map((section) => (
               <NumberField
                 key={section}
-                label={`${SECTION_LABELS[section]} band`}
+                label={t.targets.sectionBand(t.sections[section])}
                 max={9}
                 min={0}
                 onChange={(target) => updateProfile({ sectionTargets: { [section]: target } })}
                 step={0.5}
-                suffix="band"
+                suffix={t.units.band}
                 value={profile.sectionTargets[section]}
               />
             ))}
@@ -61,55 +64,55 @@ export function TargetDashboard({
         </fieldset>
 
         <fieldset className="min-w-0">
-          <legend className="text-sm font-semibold text-ink">Daily Goals</legend>
+          <legend className="text-sm font-semibold text-ink">{t.targets.dailyGoals}</legend>
           <div className="mt-3 grid min-w-0 grid-cols-2 gap-3 md:grid-cols-3">
             <NumberField
-              label="Words"
+              label={t.checkIn.taskLabels.words}
               max={999}
               min={0}
               onChange={(wordsTarget) => updateDailyGoals({ wordsTarget })}
               step={10}
-              suffix="words"
+              suffix={t.units.words}
               value={dailyGoals.wordsTarget}
             />
             <NumberField
-              label="Speaking topics"
+              label={t.checkIn.taskLabels.speakingTopics}
               max={99}
               min={0}
               onChange={(speakingTopicsTarget) => updateDailyGoals({ speakingTopicsTarget })}
               step={1}
-              suffix="topics"
+              suffix={t.units.topics}
               value={dailyGoals.speakingTopicsTarget}
             />
             <NumberField
-              label="Listening tests"
+              label={t.checkIn.taskLabels.listeningTests}
               max={10}
               min={0}
               onChange={(listeningTestsTarget) => updateDailyGoals({ listeningTestsTarget })}
               step={1}
-              suffix="tests"
+              suffix={t.units.tests}
               value={dailyGoals.listeningTestsTarget}
             />
             <NumberField
-              label="Corpus minutes"
+              label={t.checkIn.taskLabels.corpusMinutes}
               max={600}
               min={0}
               onChange={(corpusMinutesTarget) => updateDailyGoals({ corpusMinutesTarget })}
               step={5}
-              suffix="min"
+              suffix={t.units.minutesShort}
               value={dailyGoals.corpusMinutesTarget}
             />
             {IELTS_SECTIONS.map((section) => (
               <NumberField
                 key={section}
-                label={`${SECTION_LABELS[section]} minutes`}
+                label={t.targets.sectionMinutes(t.sections[section])}
                 max={600}
                 min={0}
                 onChange={(minutes) =>
                   updateDailyGoals({ sectionMinutesTarget: { [section]: minutes } })
                 }
                 step={5}
-                suffix="min"
+                suffix={t.units.minutesShort}
                 value={dailyGoals.sectionMinutesTarget[section]}
               />
             ))}

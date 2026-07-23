@@ -1,8 +1,9 @@
-import { render, screen, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { Heatmap60 } from "./Heatmap60";
 import type { DailyRecord } from "../../domain/types";
+import { renderWithI18n } from "../../test/renderWithI18n";
 
 const baseRecord: DailyRecord = {
   recordId: "record-1",
@@ -32,7 +33,7 @@ describe("Heatmap60", () => {
   it("renders 60 accessible days with a 0 to 100 legend", async () => {
     const user = userEvent.setup();
 
-    render(<Heatmap60 records={[baseRecord]} today="2026-07-22" />);
+    renderWithI18n(<Heatmap60 records={[baseRecord]} today="2026-07-22" />);
 
     const heatmap = screen.getByTestId("history-heatmap");
     const dayButtons = within(heatmap).getAllByRole("button");
@@ -52,7 +53,7 @@ describe("Heatmap60", () => {
   });
 
   it("updates the active detail when records change", () => {
-    const { rerender } = render(<Heatmap60 records={[]} today="2026-07-22" />);
+    const { rerender } = renderWithI18n(<Heatmap60 records={[]} today="2026-07-22" />);
 
     expect(screen.getByTestId("heatmap-day-detail")).toHaveTextContent(
       "2026-07-22 - 0% complete"

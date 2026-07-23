@@ -1,9 +1,10 @@
 import { Pause, Play, RotateCw, Save, Square } from "lucide-react";
 import type { FormEvent } from "react";
-import { useMemo, useState } from "react";
-import { IELTS_SECTIONS, SECTION_LABELS } from "../../domain/defaults";
+import { useState } from "react";
+import { IELTS_SECTIONS } from "../../domain/defaults";
 import type { DailyGoals, IeltsSection, TimerSession } from "../../domain/types";
 import { useStudyTimer } from "../../hooks/useStudyTimer";
+import { useI18n } from "../../i18n/I18nProvider";
 import { Button } from "../ui/Button";
 
 interface StudyTimerPanelProps {
@@ -41,6 +42,7 @@ export function StudyTimerPanel({
   userId,
   addTimerSession
 }: StudyTimerPanelProps) {
+  const { t } = useI18n();
   const [selectedSection, setSelectedSection] = useState<IeltsSection>("reading");
   const [manualSection, setManualSection] = useState<IeltsSection>("reading");
   const [manualMinutes, setManualMinutes] = useState("30");
@@ -52,19 +54,8 @@ export function StudyTimerPanel({
   const recordedTimerMinutes = recordedMinutesFromSeconds(timer.elapsedSeconds);
   const showReadingOvertime = selectedSection === "reading" && timer.overtimeSeconds > 0;
   const overtimeMinutes = Math.ceil(timer.overtimeSeconds / 60);
-  const selectedSectionLabel = SECTION_LABELS[selectedSection];
-  const statusLabel = useMemo(() => {
-    switch (timer.status) {
-      case "running":
-        return "Running";
-      case "paused":
-        return "Paused";
-      case "finished":
-        return "Recorded";
-      default:
-        return "Idle";
-    }
-  }, [timer.status]);
+  const selectedSectionLabel = t.sections[selectedSection];
+  const statusLabel = t.timer.status[timer.status];
 
   const buildSession = (
     section: IeltsSection,
@@ -136,16 +127,14 @@ export function StudyTimerPanel({
 
   return (
     <section
-      aria-label="Study Timer"
+      aria-label={t.timer.regionLabel}
       className="min-w-0 rounded-[8px] border border-line bg-white shadow-sm"
       data-testid="study-timer-panel"
     >
       <div className="flex min-w-0 flex-col gap-3 border-b border-line p-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
-          <h2 className="text-base font-semibold leading-6 text-ink">Study Timer</h2>
-          <p className="mt-1 text-sm leading-5 text-muted">
-            Record focused IELTS section practice.
-          </p>
+          <h2 className="text-base font-semibold leading-6 text-ink">{t.timer.title}</h2>
+          <p className="mt-1 text-sm leading-5 text-muted">{t.timer.description}</p>
         </div>
         <div className="inline-flex min-h-9 items-center rounded-[6px] border border-line bg-surface px-3 font-mono text-xs font-semibold uppercase tracking-normal text-ink">
           {statusLabel}
@@ -154,7 +143,11 @@ export function StudyTimerPanel({
 
       <div className="grid min-w-0 gap-4 p-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
         <div className="min-w-0">
-          <div className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-4" role="group" aria-label="Timer section">
+          <div
+            className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-4"
+            role="group"
+            aria-label={t.timer.sectionGroupLabel}
+          >
             {IELTS_SECTIONS.map((section) => {
               const isSelected = section === selectedSection;
 
@@ -171,7 +164,7 @@ export function StudyTimerPanel({
                   onClick={() => setSelectedSection(section)}
                   type="button"
                 >
-                  {SECTION_LABELS[section]}
+                  {t.sections[section]}
                 </button>
               );
             })}
@@ -181,7 +174,7 @@ export function StudyTimerPanel({
             <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
               <span className="text-sm font-semibold text-ink">{selectedSectionLabel}</span>
               <span className="font-mono text-xs font-semibold text-muted">
-                Planned {plannedMinutes} min
+                {t.timer.plannedMinutes(plannedMinutes)}
               </span>
             </div>
             <div className="mt-3 font-mono text-[2.75rem] font-bold leading-none text-ink sm:text-6xl">
@@ -190,10 +183,12 @@ export function StudyTimerPanel({
             <div className="mt-3 min-h-5" aria-live="polite">
               {showReadingOvertime ? (
                 <p className="font-mono text-sm font-semibold text-red-600">
-                  已超时 {overtimeMinutes} min
+                  {t.timer.overtime(overtimeMinutes)}
                 </p>
               ) : (
-                <p className="text-sm text-muted">{recordedTimerMinutes} min ready to record</p>
+                <p className="text-sm text-muted">
+                  {t.timer.readyToRecord(recordedTimerMinutes)}
+                </p>
               )}
             </div>
           </div>
@@ -202,19 +197,19 @@ export function StudyTimerPanel({
             {timer.status === "idle" || timer.status === "finished" ? (
               <Button className="h-11 px-4" onClick={handleStart} variant="primary">
                 <Play aria-hidden="true" className="mr-2" size={16} />
-                Start
+                {t.timer.buttons.start}
               </Button>
             ) : null}
             {timer.status === "running" ? (
               <Button className="h-11 px-4" onClick={timer.pause}>
                 <Pause aria-hidden="true" className="mr-2" size={16} />
-                Pause
+                {t.timer.buttons.pause}
               </Button>
             ) : null}
             {timer.status === "paused" ? (
               <Button className="h-11 px-4" onClick={timer.resume}>
                 <RotateCw aria-hidden="true" className="mr-2" size={16} />
-                Resume
+                {t.timer.buttons.resume}
               </Button>
             ) : null}
             {timerCanFinish ? (
@@ -224,7 +219,7 @@ export function StudyTimerPanel({
                 onClick={handleFinish}
               >
                 <Square aria-hidden="true" className="mr-2" size={16} />
-                End and record
+                {t.timer.buttons.endAndRecord}
               </Button>
             ) : null}
           </div>
@@ -236,16 +231,16 @@ export function StudyTimerPanel({
           onSubmit={handleManualSubmit}
         >
           <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-            <h3 className="text-sm font-semibold text-ink">Manual Entry</h3>
+            <h3 className="text-sm font-semibold text-ink">{t.timer.manualEntry}</h3>
             <span className="rounded-[6px] border border-line bg-surface px-2 py-1 text-xs font-semibold text-muted">
-              Manual external time
+              {t.timer.manualExternalTime}
             </span>
           </div>
 
           <div className="mt-3 grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(7rem,0.8fr)]">
             <label className="min-w-0">
               <span className="block truncate text-xs font-medium uppercase tracking-normal text-muted">
-                Manual section
+                {t.timer.manualSection}
               </span>
               <select
                 className="mt-1 h-10 w-full min-w-0 rounded-[6px] border border-line bg-white px-2 text-sm font-semibold text-ink outline-none focus:border-ielts-blue focus:ring-2 focus:ring-blue-100"
@@ -254,7 +249,7 @@ export function StudyTimerPanel({
               >
                 {IELTS_SECTIONS.map((section) => (
                   <option key={section} value={section}>
-                    {SECTION_LABELS[section]}
+                    {t.sections[section]}
                   </option>
                 ))}
               </select>
@@ -262,7 +257,7 @@ export function StudyTimerPanel({
 
             <label className="min-w-0">
               <span className="block truncate text-xs font-medium uppercase tracking-normal text-muted">
-                Manual minutes
+                {t.timer.manualMinutes}
               </span>
               <input
                 className="mt-1 h-10 w-full min-w-0 rounded-[6px] border border-line bg-white px-2 font-mono text-sm font-semibold text-ink outline-none focus:border-ielts-blue focus:ring-2 focus:ring-blue-100"
@@ -279,7 +274,7 @@ export function StudyTimerPanel({
 
           <Button className="mt-3 h-11 w-full px-4 sm:w-auto" type="submit" variant="primary">
             <Save aria-hidden="true" className="mr-2" size={16} />
-            Record external time
+            {t.timer.buttons.recordExternalTime}
           </Button>
         </form>
       </div>

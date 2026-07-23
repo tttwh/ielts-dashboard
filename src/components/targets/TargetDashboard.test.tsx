@@ -1,7 +1,8 @@
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { createDefaultDailyGoals, createDefaultProfile } from "../../domain/defaults";
+import { renderWithI18n } from "../../test/renderWithI18n";
 import { TargetDashboard } from "./TargetDashboard";
 
 describe("TargetDashboard", () => {
@@ -9,7 +10,7 @@ describe("TargetDashboard", () => {
     const user = userEvent.setup();
     const updateProfile = vi.fn();
 
-    render(
+    renderWithI18n(
       <TargetDashboard
         dailyGoals={createDefaultDailyGoals("2026-07-22T00:00:00.000Z")}
         profile={createDefaultProfile("2026-07-22T00:00:00.000Z")}
@@ -33,7 +34,7 @@ describe("TargetDashboard", () => {
     const user = userEvent.setup();
     const updateDailyGoals = vi.fn();
 
-    render(
+    renderWithI18n(
       <TargetDashboard
         dailyGoals={createDefaultDailyGoals("2026-07-22T00:00:00.000Z")}
         profile={createDefaultProfile("2026-07-22T00:00:00.000Z")}

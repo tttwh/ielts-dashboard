@@ -1,6 +1,7 @@
-import { render, screen, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { createInitialAchievements } from "../../domain/achievements";
+import { renderWithI18n } from "../../test/renderWithI18n";
 import { RewardsPanel } from "./RewardsPanel";
 
 describe("RewardsPanel", () => {
@@ -16,7 +17,7 @@ describe("RewardsPanel", () => {
           : achievement
     );
 
-    render(
+    renderWithI18n(
       <RewardsPanel
         achievements={achievements}
         latestUnlockedAchievementId="all-clear"

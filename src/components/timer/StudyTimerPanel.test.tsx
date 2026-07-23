@@ -1,7 +1,8 @@
-import { act, render, screen, within } from "@testing-library/react";
+import { act, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createDefaultDailyGoals } from "../../domain/defaults";
+import { renderWithI18n } from "../../test/renderWithI18n";
 import { StudyTimerPanel } from "./StudyTimerPanel";
 
 const dailyGoals = createDefaultDailyGoals("2026-07-22T00:00:00.000Z");
@@ -15,7 +16,7 @@ describe("StudyTimerPanel", () => {
     const user = userEvent.setup();
     const addTimerSession = vi.fn();
 
-    render(
+    renderWithI18n(
       <StudyTimerPanel
         addTimerSession={addTimerSession}
         dailyGoals={dailyGoals}
@@ -48,7 +49,7 @@ describe("StudyTimerPanel", () => {
   it("shows reading overtime warning after the 60 minute planned time", () => {
     vi.useFakeTimers();
 
-    render(
+    renderWithI18n(
       <StudyTimerPanel
         addTimerSession={() => undefined}
         dailyGoals={dailyGoals}
@@ -70,6 +71,6 @@ describe("StudyTimerPanel", () => {
       vi.advanceTimersByTime(62 * 60 * 1000);
     });
 
-    expect(screen.getByText("已超时 2 min")).toBeVisible();
+    expect(screen.getByText("Overtime 2 min")).toBeVisible();
   });
 });

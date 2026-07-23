@@ -186,7 +186,7 @@ test("study timer records reading overtime on desktop and mobile", async ({ page
   await page.clock.fastForward("01:02:00");
 
   await expect(timerPanel.getByText("01:02:00")).toBeVisible();
-  await expect(timerPanel.getByText("已超时 2 min")).toBeVisible();
+  await expect(timerPanel.getByText("Overtime 2 min")).toBeVisible();
 
   await timerPanel.getByRole("button", { name: /end and record/i }).click();
 
