@@ -10,14 +10,18 @@ describe("AppShell", () => {
     renderWithI18n(
       <AppShell
         activeView="overview"
+        authSlot={<div data-testid="auth-slot">Auth</div>}
         onViewChange={onViewChange}
         summary={<div data-testid="summary">Summary</div>}
+        syncStatusSlot={<div data-testid="sync-slot">Sync</div>}
       >
         <div>Main workspace</div>
       </AppShell>
     );
 
     expect(screen.getByTestId("summary")).toBeVisible();
+    expect(screen.getByTestId("auth-slot")).toBeVisible();
+    expect(screen.getByTestId("sync-slot")).toBeVisible();
     expect(screen.getByTestId("dashboard-navigation")).toBeVisible();
     expect(screen.getByRole("link", { name: "Overview" })).toHaveAttribute(
       "aria-current",

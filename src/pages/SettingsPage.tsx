@@ -4,21 +4,44 @@ import { TargetDashboard } from "../components/targets/TargetDashboard";
 import type { DailyGoals, UserProfile } from "../domain/types";
 import type { DailyGoalsUpdate, ProfileUpdate } from "../hooks/useDashboardData";
 import { useI18n } from "../i18n/I18nProvider";
+import type { SyncState } from "../services/sync/syncTypes";
 
 interface SettingsPageProps {
+  cloudbaseConfigured: boolean;
   dailyGoals: DailyGoals;
   profile: UserProfile;
+  syncState: SyncState;
   updateDailyGoals(update: DailyGoalsUpdate): void;
   updateProfile(update: ProfileUpdate): void;
 }
 
+const syncLabel = (t: ReturnType<typeof useI18n>["t"], syncState: SyncState) => {
+  switch (syncState.mode) {
+    case "syncing":
+      return t.sync.syncing;
+    case "synced":
+      return t.sync.synced;
+    case "offline":
+      return t.sync.offline;
+    case "error":
+      return t.sync.error;
+    case "guest":
+    default:
+      return t.sync.guest;
+  }
+};
+
 export function SettingsPage({
+  cloudbaseConfigured,
   dailyGoals,
   profile,
+  syncState,
   updateDailyGoals,
   updateProfile
 }: SettingsPageProps) {
   const { t } = useI18n();
+  const cloudbaseMode = cloudbaseConfigured ? t.sync.cloudbaseReady : t.sync.guest;
+  const currentSyncLabel = syncLabel(t, syncState);
 
   return (
     <div className="page-stack">
@@ -45,10 +68,27 @@ export function SettingsPage({
           {t.settings.storageTitle}
         </h3>
         <p className="mt-1 text-sm text-muted">{t.settings.storageDescription}</p>
-        <div className="mt-3 grid gap-2 font-mono text-xs font-semibold text-ink">
-          <span>{t.settings.localStateKey}</span>
-          <span>{t.settings.languageKey}</span>
-          <span className="text-ielts-purple">{t.settings.cloudReady}</span>
+        <div className="mt-3 grid gap-2 text-xs font-semibold text-ink sm:grid-cols-2">
+          <div className="min-w-0 rounded-[6px] border border-white/70 bg-white/55 px-2.5 py-2">
+            <span className="block text-muted">{t.settings.cloudMode}</span>
+            <span className="mt-1 block break-words font-mono text-ielts-blue">{cloudbaseMode}</span>
+          </div>
+          <div className="min-w-0 rounded-[6px] border border-white/70 bg-white/55 px-2.5 py-2">
+            <span className="block text-muted">{t.settings.syncStatus}</span>
+            <span className="mt-1 block break-words font-mono text-ielts-purple">
+              {currentSyncLabel}
+            </span>
+          </div>
+          <span className="min-w-0 break-words font-mono">{t.settings.localStateKey}</span>
+          <span className="min-w-0 break-words font-mono">{t.settings.languageKey}</span>
+          <span className="min-w-0 break-words text-ielts-purple sm:col-span-2">
+            {t.settings.cloudReady}
+          </span>
+          {syncState.message ? (
+            <span className="min-w-0 break-words text-muted sm:col-span-2">
+              {syncState.message}
+            </span>
+          ) : null}
         </div>
       </section>
     </div>

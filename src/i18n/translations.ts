@@ -39,6 +39,38 @@ export interface I18nText {
   shell: {
     sidebarLabel: string;
   };
+  auth: {
+    title: string;
+    account: string;
+    email: string;
+    username: string;
+    password: string;
+    verificationCode: string;
+    signIn: string;
+    signUp: string;
+    sendVerificationCode: string;
+    completeSignUp: string;
+    signOut: string;
+    guest: string;
+    loading: string;
+    cloudUnavailable: string;
+    signedInAs(accountName: string): string;
+    validation: {
+      accountHelp: string;
+      emailHelp: string;
+      usernameHelp: string;
+      passwordHelp: string;
+      codeHelp: string;
+    };
+  };
+  sync: {
+    guest: string;
+    syncing: string;
+    synced: string;
+    offline: string;
+    error: string;
+    cloudbaseReady: string;
+  };
   checkIn: {
     regionLabel: string;
     title: string;
@@ -130,6 +162,8 @@ export interface I18nText {
     localStateKey: string;
     languageKey: string;
     cloudReady: string;
+    cloudMode: string;
+    syncStatus: string;
   };
   units: {
     band: string;
@@ -248,6 +282,39 @@ export const translations: Record<Language, I18nText> = {
     shell: {
       sidebarLabel: "Compact dashboard panels"
     },
+    auth: {
+      title: "Cloud account",
+      account: "Account",
+      email: "Email",
+      username: "Username",
+      password: "Password",
+      verificationCode: "Verification code",
+      signIn: "Sign in",
+      signUp: "Sign up",
+      sendVerificationCode: "Send verification code",
+      completeSignUp: "Complete sign up",
+      signOut: "Sign out",
+      guest: "Guest",
+      loading: "Loading account",
+      cloudUnavailable: "CloudBase is not configured for this build.",
+      signedInAs: (accountName) => `Signed in as ${accountName}`,
+      validation: {
+        accountHelp: "Use a valid email or a 5-24 character username.",
+        emailHelp: "Enter a valid email address.",
+        usernameHelp:
+          "Username must be 5-24 characters and may use letters, numbers, underscores, or hyphens.",
+        passwordHelp: "Password must be 8-32 characters and include letters and numbers.",
+        codeHelp: "Enter the 6-digit verification code."
+      }
+    },
+    sync: {
+      guest: "Local guest",
+      syncing: "Syncing",
+      synced: "Synced",
+      offline: "Offline changes",
+      error: "Sync error",
+      cloudbaseReady: "CloudBase ready"
+    },
     checkIn: {
       regionLabel: "Daily Check-In",
       title: "Daily Check-In",
@@ -338,7 +405,9 @@ export const translations: Record<Language, I18nText> = {
       storageDescription: "This version stores study data in the current browser.",
       localStateKey: "Study data key: ielts-dashboard-state",
       languageKey: "Language key: ielts-dashboard-language",
-      cloudReady: "Cloud sync is planned, not active."
+      cloudReady: "Cloud sync is planned, not active.",
+      cloudMode: "CloudBase mode",
+      syncStatus: "Sync status"
     },
     units: {
       band: "band",
@@ -390,6 +459,38 @@ export const translations: Record<Language, I18nText> = {
     },
     shell: {
       sidebarLabel: "紧凑看板侧栏"
+    },
+    auth: {
+      title: "云账号",
+      account: "账号",
+      email: "邮箱",
+      username: "用户名",
+      password: "密码",
+      verificationCode: "验证码",
+      signIn: "登录",
+      signUp: "注册",
+      sendVerificationCode: "发送验证码",
+      completeSignUp: "完成注册",
+      signOut: "退出登录",
+      guest: "访客",
+      loading: "正在读取账号",
+      cloudUnavailable: "当前构建未配置 CloudBase。",
+      signedInAs: (accountName) => `已登录：${accountName}`,
+      validation: {
+        accountHelp: "请输入有效邮箱，或 5-24 位用户名。",
+        emailHelp: "请输入有效邮箱地址。",
+        usernameHelp: "用户名需为 5-24 位，可使用字母、数字、下划线或连字符。",
+        passwordHelp: "密码需为 8-32 位，并同时包含字母和数字。",
+        codeHelp: "请输入 6 位数字验证码。"
+      }
+    },
+    sync: {
+      guest: "本地访客",
+      syncing: "同步中",
+      synced: "已同步",
+      offline: "离线更改",
+      error: "同步异常",
+      cloudbaseReady: "CloudBase 已就绪"
     },
     checkIn: {
       regionLabel: "每日打卡",
@@ -484,7 +585,9 @@ export const translations: Record<Language, I18nText> = {
       storageDescription: "当前版本会把学习数据保存在当前浏览器。",
       localStateKey: "学习数据 key：ielts-dashboard-state",
       languageKey: "语言 key：ielts-dashboard-language",
-      cloudReady: "云同步已规划，当前尚未启用。"
+      cloudReady: "云同步已规划，当前尚未启用。",
+      cloudMode: "CloudBase 模式",
+      syncStatus: "同步状态"
     },
     units: {
       band: "分",

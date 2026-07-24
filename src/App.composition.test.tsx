@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react";
+import { render, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createDefaultAppState } from "./domain/defaults";
@@ -13,15 +13,37 @@ const mocks = vi.hoisted(() => {
 
   return {
     appShellProps: vi.fn(),
+    authPanelProps: vi.fn(),
     checkInPageProps: vi.fn(),
+    createAuthService: vi.fn(),
+    createCloudBaseClient: vi.fn(),
+    createCloudRepository: vi.fn(),
     createLocalStorageRepository: vi.fn(() => fakeRepository),
+    createSyncManager: vi.fn(),
+    fakeAuthService: {
+      completeEmailSignUp: vi.fn(),
+      getCurrentUser: vi.fn(),
+      onAuthStateChanged: vi.fn(),
+      signIn: vi.fn(),
+      signOut: vi.fn(),
+      startEmailSignUp: vi.fn()
+    },
+    fakeCloudBaseClient: {
+      auth: {},
+      rdb: vi.fn()
+    },
+    fakeCloudRepository: {},
     fakeRepository,
+    fakeRdb: {},
+    fakeSyncManager: {},
     overviewPageProps: vi.fn(),
     progressPageProps: vi.fn(),
+    readCloudBaseConfig: vi.fn(),
     rewardsPageProps: vi.fn(),
     settingsPageProps: vi.fn(),
     studyTimerPageProps: vi.fn(),
     summaryHeaderProps: vi.fn(),
+    useAuthSession: vi.fn(),
     useCurrentDateKey: vi.fn(() => "2026-07-22"),
     useDashboardData: vi.fn()
   };
@@ -29,6 +51,27 @@ const mocks = vi.hoisted(() => {
 
 vi.mock("./services/storage/appRepository", () => ({
   createLocalStorageRepository: mocks.createLocalStorageRepository
+}));
+
+vi.mock("./services/cloudbase/authService", () => ({
+  createAuthService: mocks.createAuthService
+}));
+
+vi.mock("./services/cloudbase/cloudbaseClient", () => ({
+  createCloudBaseClient: mocks.createCloudBaseClient,
+  readCloudBaseConfig: mocks.readCloudBaseConfig
+}));
+
+vi.mock("./services/cloudbase/cloudRepository", () => ({
+  createCloudRepository: mocks.createCloudRepository
+}));
+
+vi.mock("./services/sync/syncManager", () => ({
+  createSyncManager: mocks.createSyncManager
+}));
+
+vi.mock("./hooks/useAuthSession", () => ({
+  useAuthSession: mocks.useAuthSession
 }));
 
 vi.mock("./hooks/useDashboardData", () => ({
@@ -39,23 +82,37 @@ vi.mock("./hooks/useCurrentDateKey", () => ({
   useCurrentDateKey: mocks.useCurrentDateKey
 }));
 
+vi.mock("./components/auth/AuthPanel", () => ({
+  AuthPanel: (props: Record<string, unknown>) => {
+    mocks.authPanelProps(props);
+
+    return <div data-testid="mock-auth-panel" />;
+  }
+}));
+
 vi.mock("./components/layout/AppShell", () => ({
   AppShell: ({
     activeView,
+    authSlot,
     children,
     onViewChange,
-    summary
+    summary,
+    syncStatusSlot
   }: {
     activeView: string;
+    authSlot?: ReactNode;
     children: ReactNode;
     onViewChange(view: string): void;
     summary: ReactNode;
+    syncStatusSlot?: ReactNode;
   }) => {
-    mocks.appShellProps({ activeView, children, onViewChange, summary });
+    mocks.appShellProps({ activeView, authSlot, children, onViewChange, summary, syncStatusSlot });
 
     return (
       <div data-testid="mock-app-shell">
         <div data-testid="mock-summary-slot">{summary}</div>
+        <div data-testid="mock-sync-slot">{syncStatusSlot}</div>
+        <div data-testid="mock-auth-slot">{authSlot}</div>
         <main>{children}</main>
       </div>
     );
@@ -120,6 +177,24 @@ vi.mock("./pages/SettingsPage", () => ({
 
 import App from "./App";
 
+function arrangeAuthSession(overrides: Record<string, unknown> = {}) {
+  const session = {
+    completeEmailSignUp: vi.fn(),
+    errorMessage: null,
+    pendingSignUp: null,
+    signIn: vi.fn(),
+    signOut: vi.fn(),
+    startEmailSignUp: vi.fn(),
+    status: "guest",
+    user: null,
+    ...overrides
+  };
+
+  mocks.useAuthSession.mockReturnValue(session);
+
+  return session;
+}
+
 function arrangeDashboardData() {
   const state = createDefaultAppState("2026-07-22T00:00:00.000Z");
   const todayRecord = createEmptyDailyRecord(
@@ -131,12 +206,20 @@ function arrangeDashboardData() {
   const updateDailyGoals = vi.fn();
   const updateTodayRecord = vi.fn();
   const addTimerSession = vi.fn();
+  const syncNow = vi.fn().mockResolvedValue(undefined);
+  const syncState = {
+    lastSyncedAt: null,
+    message: null,
+    mode: "guest"
+  };
 
   state.records = [{ ...todayRecord, xpEarned: 135 }];
   mocks.useDashboardData.mockReturnValue({
     addTimerSession,
     latestUnlockedAchievementId: "first-steps",
     state,
+    syncNow,
+    syncState,
     todayRecord,
     updateDailyGoals,
     updateProfile,
@@ -146,6 +229,8 @@ function arrangeDashboardData() {
   return {
     addTimerSession,
     state,
+    syncNow,
+    syncState,
     todayRecord,
     updateDailyGoals,
     updateProfile,
@@ -156,25 +241,50 @@ function arrangeDashboardData() {
 describe("App composition", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.fakeCloudBaseClient.rdb.mockReturnValue(mocks.fakeRdb);
+    mocks.createAuthService.mockReturnValue(mocks.fakeAuthService);
+    mocks.createCloudBaseClient.mockReturnValue(mocks.fakeCloudBaseClient);
+    mocks.createCloudRepository.mockReturnValue(mocks.fakeCloudRepository);
+    mocks.createSyncManager.mockReturnValue(mocks.fakeSyncManager);
+    mocks.readCloudBaseConfig.mockImplementation(() => {
+      throw new Error("VITE_CLOUDBASE_ENV_ID is required");
+    });
     window.history.replaceState(null, "", "/");
   });
 
   it("creates the local storage repository and wires summary plus default overview", () => {
     const data = arrangeDashboardData();
+    const authSession = arrangeAuthSession();
 
     render(<App />);
 
     expect(mocks.createLocalStorageRepository).toHaveBeenCalledTimes(1);
+    expect(mocks.createCloudBaseClient).not.toHaveBeenCalled();
     expect(mocks.useDashboardData).toHaveBeenCalledWith(
       mocks.fakeRepository satisfies AppRepository,
-      "2026-07-22"
+      "2026-07-22",
+      undefined
     );
     expect(mocks.appShellProps).toHaveBeenCalledWith(
       expect.objectContaining({
         activeView: "overview",
+        authSlot: expect.anything(),
         children: expect.anything(),
         onViewChange: expect.any(Function),
-        summary: expect.anything()
+        summary: expect.anything(),
+        syncStatusSlot: expect.anything()
+      })
+    );
+    expect(mocks.authPanelProps).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accountName: null,
+        errorMessage: null,
+        onCompleteEmailSignUp: authSession.completeEmailSignUp,
+        onSignIn: authSession.signIn,
+        onSignOut: authSession.signOut,
+        onStartEmailSignUp: authSession.startEmailSignUp,
+        pendingSignUpEmail: null,
+        status: "guest"
       })
     );
     expect(mocks.summaryHeaderProps).toHaveBeenCalledWith(
@@ -197,8 +307,52 @@ describe("App composition", () => {
     expect(mocks.checkInPageProps).not.toHaveBeenCalled();
   });
 
+  it("creates CloudBase services when config exists and syncs authenticated users", async () => {
+    const cloudConfig = {
+      accessKey: "publishable-test-key",
+      envId: "test-env",
+      region: "ap-shanghai"
+    };
+    mocks.readCloudBaseConfig.mockReturnValue(cloudConfig);
+    const data = arrangeDashboardData();
+    const authSession = arrangeAuthSession({
+      status: "authenticated",
+      user: {
+        accountName: null,
+        email: "weihao@example.com",
+        uid: "cloud-user-1",
+        username: null
+      }
+    });
+
+    render(<App />);
+
+    expect(mocks.createCloudBaseClient).toHaveBeenCalledWith(cloudConfig);
+    expect(mocks.createAuthService).toHaveBeenCalledWith(mocks.fakeCloudBaseClient.auth);
+    expect(mocks.fakeCloudBaseClient.rdb).toHaveBeenCalledOnce();
+    expect(mocks.createCloudRepository).toHaveBeenCalledWith(mocks.fakeRdb);
+    expect(mocks.createSyncManager).toHaveBeenCalledWith(mocks.fakeCloudRepository);
+    expect(mocks.useAuthSession).toHaveBeenCalledWith(mocks.fakeAuthService);
+    expect(mocks.useDashboardData).toHaveBeenCalledWith(
+      mocks.fakeRepository satisfies AppRepository,
+      "2026-07-22",
+      mocks.fakeSyncManager
+    );
+    expect(mocks.authPanelProps).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accountName: "weihao@example.com",
+        status: "authenticated"
+      })
+    );
+    await waitFor(() => {
+      expect(data.syncNow).toHaveBeenCalledWith("cloud-user-1", "weihao@example.com");
+    });
+    expect(authSession.user).toMatchObject({ uid: "cloud-user-1" });
+  });
+
   it("wires the check-in page when the check-in route is active", () => {
     const data = arrangeDashboardData();
+    arrangeAuthSession();
     window.history.replaceState(null, "", "#checkin");
 
     render(<App />);
@@ -212,6 +366,7 @@ describe("App composition", () => {
 
   it("wires the timer page when the timer route is active", () => {
     const data = arrangeDashboardData();
+    arrangeAuthSession();
     window.history.replaceState(null, "", "#timer");
 
     render(<App />);
@@ -226,6 +381,7 @@ describe("App composition", () => {
 
   it("wires the progress page when the progress route is active", () => {
     const data = arrangeDashboardData();
+    arrangeAuthSession();
     window.history.replaceState(null, "", "#progress");
 
     render(<App />);
@@ -238,6 +394,7 @@ describe("App composition", () => {
 
   it("wires the rewards page when the rewards route is active", () => {
     const data = arrangeDashboardData();
+    arrangeAuthSession();
     window.history.replaceState(null, "", "#rewards");
 
     render(<App />);
@@ -252,13 +409,16 @@ describe("App composition", () => {
 
   it("wires the settings page when the settings route is active", () => {
     const data = arrangeDashboardData();
+    arrangeAuthSession();
     window.history.replaceState(null, "", "#settings");
 
     render(<App />);
 
     expect(mocks.settingsPageProps).toHaveBeenCalledWith({
       dailyGoals: data.state.dailyGoals,
+      cloudbaseConfigured: false,
       profile: data.state.profile,
+      syncState: data.syncState,
       updateDailyGoals: data.updateDailyGoals,
       updateProfile: data.updateProfile
     });

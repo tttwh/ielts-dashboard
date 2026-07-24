@@ -4,6 +4,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import { readState } from "./services/storage/localStorageAdapter";
 
+vi.mock("./services/cloudbase/cloudbaseClient", () => ({
+  createCloudBaseClient: vi.fn(),
+  readCloudBaseConfig: vi.fn(() => {
+    throw new Error("VITE_CLOUDBASE_ENV_ID is required");
+  })
+}));
+
 describe("App", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -30,6 +37,8 @@ describe("App", () => {
 
     expect(screen.getByRole("heading", { name: "IELTS Prep Dashboard" })).toBeVisible();
     expect(screen.getByText(/Local mode . cloud-ready schema/)).toBeVisible();
+    expect(screen.getByText("Guest")).toBeVisible();
+    expect(screen.getByText("Local guest")).toBeVisible();
     expect(screen.getByTestId("dashboard-navigation")).toBeVisible();
     expect(screen.getByRole("link", { name: "Overview" })).toHaveAttribute(
       "aria-current",
@@ -51,6 +60,17 @@ describe("App", () => {
     expect(screen.getByRole("heading", { name: "Overview" })).toBeVisible();
     expect(screen.queryByTestId("daily-checkin")).not.toBeInTheDocument();
     expect(screen.getByRole("main")).toBeVisible();
+  });
+
+  it("shows CloudBase and sync status in settings while CloudBase is unconfigured", () => {
+    render(<App />);
+
+    openView("Settings");
+
+    expect(screen.getByText("CloudBase mode")).toBeVisible();
+    expect(screen.getByText("Sync status")).toBeVisible();
+    expect(screen.getAllByText("Local guest").length).toBeGreaterThan(0);
+    expect(screen.getByText("Study data key: ielts-dashboard-state")).toBeVisible();
   });
 
   it("switches visible dashboard copy between Chinese and English and persists the choice", async () => {
