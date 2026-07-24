@@ -440,4 +440,121 @@ describe("useDashboardData", () => {
     expect(repo.loadAppState()).toEqual(pushedResult.state);
     expect(result.current.syncState).toEqual(pushedResult.syncState);
   });
+
+  it("preserves local edits made while a sync request is in flight", async () => {
+    const repo = createMemoryRepository();
+    let resolvePush: (result: SyncResult) => void = () => undefined;
+    const pushPromise = new Promise<SyncResult>((resolve) => {
+      resolvePush = resolve;
+    });
+    const importOrLoad = vi.fn(async (_userId: string, localState: AppState) =>
+      syncedResult(withUserId(localState, "cloud-user-1"))
+    );
+    const push = vi.fn<SyncManager["push"]>(() => pushPromise);
+    const syncManager: SyncManager = {
+      importOrLoad,
+      push
+    };
+    const { result } = renderHook(() => useDashboardData(repo, today, syncManager));
+
+    await act(async () => {
+      await result.current.syncNow("cloud-user-1", "weihao_01");
+    });
+
+    act(() => {
+      result.current.updateTodayRecord({ words: 100 });
+    });
+
+    let syncPromise: Promise<void> = Promise.resolve();
+    await act(async () => {
+      syncPromise = result.current.syncNow("cloud-user-1", "weihao_01");
+    });
+
+    const staleSyncState = push.mock.calls[0][0];
+
+    vi.setSystemTime(new Date("2026-07-22T08:00:01.000Z"));
+    act(() => {
+      result.current.updateTodayRecord({ words: 200 });
+    });
+
+    expect(result.current.todayRecord.words).toBe(200);
+    expect(repo.loadAppState().records[0].words).toBe(200);
+
+    await act(async () => {
+      resolvePush(syncedResult(withUserId(staleSyncState, "cloud-user-1")));
+      await syncPromise;
+    });
+
+    expect(result.current.todayRecord).toMatchObject({
+      words: 200,
+      updatedAt: "2026-07-22T08:00:01.000Z"
+    });
+    expect(repo.loadAppState().records[0]).toMatchObject({
+      words: 200,
+      updatedAt: "2026-07-22T08:00:01.000Z"
+    });
+  });
+
+  it("does not overwrite local edits when an in-flight sync returns an error result", async () => {
+    const repo = createMemoryRepository();
+    let resolvePush: (result: SyncResult) => void = () => undefined;
+    const pushPromise = new Promise<SyncResult>((resolve) => {
+      resolvePush = resolve;
+    });
+    const importOrLoad = vi.fn(async (_userId: string, localState: AppState) =>
+      syncedResult(withUserId(localState, "cloud-user-1"))
+    );
+    const push = vi.fn<SyncManager["push"]>(() => pushPromise);
+    const syncManager: SyncManager = {
+      importOrLoad,
+      push
+    };
+    const { result } = renderHook(() => useDashboardData(repo, today, syncManager));
+
+    await act(async () => {
+      await result.current.syncNow("cloud-user-1", "weihao_01");
+    });
+
+    act(() => {
+      result.current.updateTodayRecord({ words: 100 });
+    });
+
+    let syncPromise: Promise<void> = Promise.resolve();
+    await act(async () => {
+      syncPromise = result.current.syncNow("cloud-user-1", "weihao_01");
+    });
+
+    const staleSyncState = push.mock.calls[0][0];
+
+    vi.setSystemTime(new Date("2026-07-22T08:00:01.000Z"));
+    act(() => {
+      result.current.updateTodayRecord({ words: 200 });
+    });
+
+    await act(async () => {
+      resolvePush({
+        state: staleSyncState,
+        syncState: {
+          mode: "error",
+          message: "network down",
+          lastSyncedAt: null
+        }
+      });
+      await syncPromise;
+    });
+
+    expect(result.current.todayRecord).toMatchObject({
+      words: 200,
+      updatedAt: "2026-07-22T08:00:01.000Z"
+    });
+    expect(repo.loadAppState().records[0]).toMatchObject({
+      words: 200,
+      updatedAt: "2026-07-22T08:00:01.000Z"
+    });
+    expect(result.current.syncState).toEqual({
+      mode: "error",
+      message: "network down",
+      lastSyncedAt: null
+    });
+  });
 });

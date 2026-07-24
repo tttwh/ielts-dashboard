@@ -20,6 +20,11 @@ import type {
   AppState,
   AppStateMutation
 } from "../services/storage/storageTypes";
+import {
+  markAppStateSynced,
+  mergeAppStates,
+  replaceAppStateUserId
+} from "../services/sync/syncManager";
 import type { SyncManager } from "../services/sync/syncManager";
 import type { SyncState } from "../services/sync/syncTypes";
 
@@ -146,6 +151,15 @@ const errorSyncState = (error: unknown, lastSyncedAt: string | null): SyncState 
   message: error instanceof Error ? error.message : String(error),
   lastSyncedAt
 });
+
+const stateForSyncMerge = (
+  state: AppState,
+  userId: string,
+  shouldImportOrLoad: boolean
+): AppState => (shouldImportOrLoad ? replaceAppStateUserId(state, userId) : state);
+
+const successfulSyncState = (state: AppState, syncState: SyncState): AppState =>
+  syncState.mode === "synced" ? markAppStateSynced(state) : state;
 
 export function useDashboardData(
   repository?: AppRepository,
@@ -414,10 +428,29 @@ export function useDashboardData(
           ? await syncManager.importOrLoad(userId, localState, accountName)
           : await syncManager.push(localState, accountName);
 
-        stateRef.current = result.state;
-        repo.saveAppState(result.state);
-        setState(result.state);
-        commitSyncState(result.syncState);
+        if (result.syncState.mode === "error") {
+          commitSyncState(result.syncState);
+          return;
+        }
+
+        const currentState = stateRef.current;
+        const resultState = successfulSyncState(result.state, result.syncState);
+        const nextState =
+          currentState === localState
+            ? resultState
+            : mergeAppStates(
+                stateForSyncMerge(currentState, userId, shouldImportOrLoad),
+                resultState
+              );
+
+        stateRef.current = nextState;
+        repo.saveAppState(nextState);
+        setState(nextState);
+        commitSyncState(
+          currentState === localState
+            ? result.syncState
+            : offlineSyncState(result.syncState.lastSyncedAt)
+        );
 
         if (result.syncState.mode === "synced") {
           syncedUserIdRef.current = userId;
