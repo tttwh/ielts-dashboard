@@ -232,6 +232,73 @@ describe("local storage repository", () => {
     });
   });
 
+  it("loads old persisted profiles without account status", () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(createStoredState()));
+
+    const state = createLocalStorageRepository().loadAppState();
+
+    expect(state.profile.userId).toBe("local-user");
+    expect(state.profile.accountStatus).toBeUndefined();
+  });
+
+  it("loads persisted profiles with valid account status", () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify(
+        createStoredState({
+          profile: {
+            ...validProfile,
+            accountStatus: "pending"
+          }
+        })
+      )
+    );
+
+    const state = createLocalStorageRepository().loadAppState();
+
+    expect(state.profile.accountStatus).toBe("pending");
+  });
+
+  it("recovers from persisted profiles with invalid account status", () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify(
+        createStoredState({
+          profile: {
+            ...validProfile,
+            accountStatus: "archived"
+          }
+        })
+      )
+    );
+
+    const state = createLocalStorageRepository().loadAppState();
+
+    expect(state.profile.userId).toBe("local-user");
+    expect(state.profile.accountStatus).toBeUndefined();
+  });
+
+  it("loads sync-error sync status for locally persisted cloud entities", () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify(
+        createStoredState({
+          dailyGoals: { ...validDailyGoals, syncStatus: "sync-error" },
+          records: [{ ...validRecord, syncStatus: "sync-error" }],
+          timerSessions: [{ ...validTimerSession, syncStatus: "sync-error" }],
+          achievements: [{ ...validAchievement, syncStatus: "sync-error" }]
+        })
+      )
+    );
+
+    const state = createLocalStorageRepository().loadAppState();
+
+    expect(state.dailyGoals.syncStatus).toBe("sync-error");
+    expect(state.records[0].syncStatus).toBe("sync-error");
+    expect(state.timerSessions[0].syncStatus).toBe("sync-error");
+    expect(state.achievements[0].syncStatus).toBe("sync-error");
+  });
+
   it("round-trips goals, record xp, timer sessions, and achievement unlock state", () => {
     const repo = createLocalStorageRepository();
     const state = repo.loadAppState();

@@ -1,0 +1,301 @@
+import { describe, expect, it, vi } from "vitest";
+import { createDefaultAppState } from "../../domain/defaults";
+import type { Achievement, DailyRecord, TimerSession } from "../../domain/types";
+import type { CloudRepository } from "../cloudbase/cloudRepository";
+import type { AppState } from "../storage/storageTypes";
+import {
+  createSyncManager,
+  markAppStateSynced,
+  mergeAppStates,
+  replaceAppStateUserId,
+  type SyncManager,
+  type SyncMode,
+  type SyncResult,
+  type SyncState
+} from "./syncManager";
+
+const now = "2026-07-24T00:00:00.000Z";
+const newer = "2026-07-24T02:00:00.000Z";
+const older = "2026-07-24T01:00:00.000Z";
+
+const sectionMinutes = {
+  listening: 45,
+  speaking: 30,
+  reading: 60,
+  writing: 45
+};
+
+const _typeExports: {
+  manager: SyncManager | null;
+  mode: SyncMode;
+  result: SyncResult | null;
+  state: SyncState;
+} = {
+  manager: null,
+  mode: "guest",
+  result: null,
+  state: {
+    mode: "guest",
+    message: null,
+    lastSyncedAt: null
+  }
+};
+
+const createRecord = (overrides: Partial<DailyRecord> = {}): DailyRecord => ({
+  recordId: "record-2026-07-24",
+  userId: "local-user",
+  date: "2026-07-24",
+  words: 120,
+  speakingTopics: 3,
+  listeningTests: 1,
+  corpusMinutes: 30,
+  sectionMinutes,
+  readingOvertimeMinutes: 0,
+  completionRate: 0.8,
+  isAllClear: false,
+  xpEarned: 90,
+  createdAt: now,
+  updatedAt: now,
+  deletedAt: null,
+  syncStatus: "local-only",
+  ...overrides
+});
+
+const createTimerSession = (overrides: Partial<TimerSession> = {}): TimerSession => ({
+  sessionId: "session-reading",
+  userId: "local-user",
+  date: "2026-07-24",
+  section: "reading",
+  source: "in-app-timer",
+  plannedMinutes: 60,
+  actualMinutes: 60,
+  overtimeMinutes: 0,
+  startedAt: now,
+  endedAt: "2026-07-24T01:00:00.000Z",
+  createdAt: now,
+  updatedAt: now,
+  deletedAt: null,
+  syncStatus: "local-only",
+  ...overrides
+});
+
+const createAchievement = (overrides: Partial<Achievement> = {}): Achievement => ({
+  achievementId: "all-clear",
+  userId: "local-user",
+  name: "All Clear",
+  description: "Complete every enabled daily target once.",
+  category: "milestone",
+  unlockedAt: null,
+  createdAt: now,
+  updatedAt: now,
+  deletedAt: null,
+  syncStatus: "local-only",
+  ...overrides
+});
+
+const createRepository = ({
+  cloudState,
+  loadError,
+  saveError
+}: {
+  cloudState?: AppState | null;
+  loadError?: Error;
+  saveError?: Error;
+} = {}) => {
+  const savedStates: AppState[] = [];
+  const repository: CloudRepository = {
+    loadCloudState: vi.fn(async () => {
+      if (loadError) throw loadError;
+      return cloudState ?? null;
+    }),
+    saveCloudState: vi.fn(async (state) => {
+      if (saveError) throw saveError;
+      savedStates.push(state);
+    })
+  };
+
+  return { repository, savedStates };
+};
+
+describe("sync manager", () => {
+  it("replaces a local guest user id across the complete app state", () => {
+    const localState: AppState = {
+      ...createDefaultAppState(now),
+      records: [createRecord()],
+      timerSessions: [createTimerSession()],
+      achievements: [createAchievement()]
+    };
+
+    const replaced = replaceAppStateUserId(localState, "cloud-user-1");
+
+    expect(replaced.profile.userId).toBe("cloud-user-1");
+    expect(replaced.dailyGoals.userId).toBe("cloud-user-1");
+    expect(replaced.records.map((record) => record.userId)).toEqual(["cloud-user-1"]);
+    expect(replaced.timerSessions.map((session) => session.userId)).toEqual(["cloud-user-1"]);
+    expect(replaced.achievements.map((achievement) => achievement.userId)).toEqual(["cloud-user-1"]);
+    expect(localState.profile.userId).toBe("local-user");
+  });
+
+  it("uploads replaced local state on first login when cloud has no state", async () => {
+    const localState: AppState = {
+      ...createDefaultAppState(now),
+      records: [createRecord({ syncStatus: "pending" })],
+      timerSessions: [createTimerSession({ syncStatus: "pending" })],
+      achievements: [createAchievement({ syncStatus: "pending" })]
+    };
+    const { repository, savedStates } = createRepository();
+    const manager = createSyncManager(repository);
+
+    const result = await manager.importOrLoad("cloud-user-1", localState, "weihao_01");
+
+    expect(repository.loadCloudState).toHaveBeenCalledWith("cloud-user-1");
+    expect(repository.saveCloudState).toHaveBeenCalledWith(savedStates[0], "weihao_01");
+    expect(savedStates[0].profile.userId).toBe("cloud-user-1");
+    expect(savedStates[0].records[0].syncStatus).toBe("synced");
+    expect(result.state).toEqual(savedStates[0]);
+    expect(result.syncState).toMatchObject({
+      mode: "synced",
+      message: null,
+      lastSyncedAt: expect.any(String)
+    });
+  });
+
+  it("merges local and cloud state by newest updatedAt for profile, goals, records, and timer sessions", async () => {
+    const localState: AppState = {
+      ...createDefaultAppState(now),
+      profile: {
+        ...createDefaultAppState(now).profile,
+        targetBand: 8,
+        updatedAt: newer
+      },
+      dailyGoals: {
+        ...createDefaultAppState(now).dailyGoals,
+        wordsTarget: 200,
+        updatedAt: older
+      },
+      records: [
+        createRecord({
+          recordId: "local-record",
+          words: 220,
+          updatedAt: newer
+        })
+      ],
+      timerSessions: [
+        createTimerSession({
+          actualMinutes: 70,
+          updatedAt: older
+        })
+      ],
+      achievements: [createAchievement()]
+    };
+    const cloudState: AppState = {
+      ...replaceAppStateUserId(createDefaultAppState(now), "cloud-user-1"),
+      profile: {
+        ...replaceAppStateUserId(createDefaultAppState(now), "cloud-user-1").profile,
+        targetBand: 7,
+        updatedAt: older
+      },
+      dailyGoals: {
+        ...replaceAppStateUserId(createDefaultAppState(now), "cloud-user-1").dailyGoals,
+        wordsTarget: 300,
+        updatedAt: newer
+      },
+      records: [
+        createRecord({
+          recordId: "cloud-record",
+          userId: "cloud-user-1",
+          words: 100,
+          updatedAt: older
+        })
+      ],
+      timerSessions: [
+        createTimerSession({
+          userId: "cloud-user-1",
+          actualMinutes: 80,
+          updatedAt: newer
+        })
+      ],
+      achievements: [createAchievement({ userId: "cloud-user-1" })]
+    };
+    const { repository, savedStates } = createRepository({ cloudState });
+    const manager = createSyncManager(repository);
+
+    const result = await manager.importOrLoad("cloud-user-1", localState, "weihao_01");
+
+    expect(result.state.profile).toMatchObject({
+      userId: "cloud-user-1",
+      targetBand: 8,
+      syncStatus: "synced"
+    });
+    expect(result.state.dailyGoals).toMatchObject({
+      userId: "cloud-user-1",
+      wordsTarget: 300,
+      syncStatus: "synced"
+    });
+    expect(result.state.records).toHaveLength(1);
+    expect(result.state.records[0]).toMatchObject({
+      recordId: "local-record",
+      userId: "cloud-user-1",
+      words: 220,
+      syncStatus: "synced"
+    });
+    expect(result.state.timerSessions).toHaveLength(1);
+    expect(result.state.timerSessions[0]).toMatchObject({
+      sessionId: "session-reading",
+      userId: "cloud-user-1",
+      actualMinutes: 80,
+      syncStatus: "synced"
+    });
+    expect(savedStates[0]).toEqual(result.state);
+  });
+
+  it("keeps unlocked achievements and preserves the earliest unlockedAt when both are unlocked", () => {
+    const localState: AppState = {
+      ...createDefaultAppState(now),
+      achievements: [
+        createAchievement({
+          unlockedAt: "2026-07-24T03:00:00.000Z",
+          updatedAt: newer
+        })
+      ]
+    };
+    const cloudState: AppState = {
+      ...replaceAppStateUserId(createDefaultAppState(now), "cloud-user-1"),
+      achievements: [
+        createAchievement({
+          userId: "cloud-user-1",
+          unlockedAt: "2026-07-24T02:00:00.000Z",
+          updatedAt: older
+        })
+      ]
+    };
+
+    const merged = mergeAppStates(replaceAppStateUserId(localState, "cloud-user-1"), cloudState);
+
+    expect(merged.achievements).toHaveLength(1);
+    expect(merged.achievements[0]).toMatchObject({
+      achievementId: "all-clear",
+      userId: "cloud-user-1",
+      unlockedAt: "2026-07-24T02:00:00.000Z"
+    });
+    expect(markAppStateSynced(merged).achievements[0].syncStatus).toBe("synced");
+  });
+
+  it("returns an error state without losing local state when push fails", async () => {
+    const state = {
+      ...createDefaultAppState(now),
+      records: [createRecord({ syncStatus: "pending" })]
+    };
+    const { repository } = createRepository({ saveError: new Error("network down") });
+    const manager = createSyncManager(repository);
+
+    const result = await manager.push(state, "weihao_01");
+
+    expect(result.state).toEqual(state);
+    expect(result.syncState).toEqual({
+      mode: "error",
+      message: "network down",
+      lastSyncedAt: null
+    });
+  });
+});

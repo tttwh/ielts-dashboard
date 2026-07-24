@@ -1,5 +1,5 @@
 export type IeltsSection = "listening" | "speaking" | "reading" | "writing";
-export type SyncStatus = "local-only" | "synced" | "pending" | "conflict";
+export type SyncStatus = "local-only" | "synced" | "pending" | "conflict" | "sync-error";
 
 export type SectionTargets = Record<IeltsSection, number>;
 export type SectionMinutes = Record<IeltsSection, number>;
@@ -9,6 +9,7 @@ export interface UserProfile {
   targetBand: number;
   sectionTargets: SectionTargets;
   syncStatus: "local" | "cloud-ready" | "synced";
+  accountStatus?: "active" | "disabled" | "pending";
   createdAt: string;
   updatedAt: string;
 }

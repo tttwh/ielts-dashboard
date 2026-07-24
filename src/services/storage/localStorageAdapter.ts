@@ -3,7 +3,8 @@ import type { AppState } from "./storageTypes";
 const STORAGE_KEY = "ielts-dashboard-state";
 const IELTS_SECTIONS = ["listening", "speaking", "reading", "writing"] as const;
 const PROFILE_SYNC_STATUSES = ["local", "cloud-ready", "synced"] as const;
-const SYNC_STATUSES = ["local-only", "synced", "pending", "conflict"] as const;
+const SYNC_STATUSES = ["local-only", "synced", "pending", "conflict", "sync-error"] as const;
+const ACCOUNT_STATUSES = ["active", "disabled", "pending"] as const;
 const TIMER_SOURCES = ["in-app-timer", "manual-external"] as const;
 const ACHIEVEMENT_CATEGORIES = ["streak", "skill", "milestone", "balance"] as const;
 
@@ -23,6 +24,9 @@ const isNullableString = (value: unknown): value is string | null =>
 const isOneOf = <T extends string>(allowedValues: readonly T[], value: unknown): value is T =>
   isString(value) && (allowedValues as readonly string[]).includes(value);
 
+const isOptionalOneOf = <T extends string>(allowedValues: readonly T[], value: unknown): value is T | undefined =>
+  value === undefined || isOneOf(allowedValues, value);
+
 const isSectionNumberRecord = (value: unknown): value is Record<(typeof IELTS_SECTIONS)[number], number> =>
   isObject(value) && IELTS_SECTIONS.every((section) => isNumber(value[section]));
 
@@ -32,6 +36,7 @@ const isUserProfile = (value: unknown) =>
   isNumber(value.targetBand) &&
   isSectionNumberRecord(value.sectionTargets) &&
   isOneOf(PROFILE_SYNC_STATUSES, value.syncStatus) &&
+  isOptionalOneOf(ACCOUNT_STATUSES, value.accountStatus) &&
   isString(value.createdAt) &&
   isString(value.updatedAt);
 
