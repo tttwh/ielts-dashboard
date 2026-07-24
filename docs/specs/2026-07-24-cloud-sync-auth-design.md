@@ -2,11 +2,13 @@
 
 ## Decision
 
-Use Supabase as the phase-one backend for user registration, login, and cloud sync. Keep the app local-first so it remains usable without login or during network failure.
+Use Tencent Cloud CloudBase PG mode as the phase-one backend for user registration, login, and cloud sync. Keep the app local-first so it remains usable without login or during network failure.
+
+This replaces the previous Supabase direction because the project now requires a service that can be paid in RMB. Supabase invoices are USD and credit-card based, while CloudBase is RMB-priced and provides authentication, PostgreSQL access, and SQL/RLS-style data isolation.
 
 Registration starts open for early testing. The data model must still support later access tightening through a user profile status field, so the project can move to whitelist or invite-only access without rewriting the sync layer.
 
-Aliyun is not needed for this phase. Revisit Aliyun only when the project needs a self-hosted API, domestic domain and ICP-related deployment work, object storage outside Supabase, or tighter infrastructure control.
+Aliyun is not needed for this phase. Revisit Aliyun only when the project needs a self-hosted API, domestic domain and ICP-related deployment work, object storage outside CloudBase, or tighter infrastructure control.
 
 ## Goals
 
@@ -15,7 +17,8 @@ Aliyun is not needed for this phase. Revisit Aliyun only when the project needs 
 - Import existing local data into the authenticated user's cloud account after first login.
 - Sync targets, daily records, timer sessions, and achievements across devices.
 - Show clear sync state in the UI: guest, syncing, synced, offline, and error.
-- Keep every user's data isolated with Supabase Row Level Security.
+- Keep every user's data isolated with CloudBase PG Row Level Security.
+- Use an RMB-priced backend service.
 - Preserve the current multi-page liquid-glass IELTS dashboard UI direction.
 - Remove first-version code that becomes unused after the auth and sync refactor.
 - Push the finished implementation to the GitHub remote after verification.
@@ -28,7 +31,7 @@ Aliyun is not needed for this phase. Revisit Aliyun only when the project needs 
 - No administrator dashboard.
 - No multi-user sharing or collaboration.
 - No automatic reading of other apps' screen-time data.
-- No payment, subscription, or public production launch workflow.
+- No payment, subscription, or public production launch workflow in this app.
 
 ## Architecture
 
@@ -36,19 +39,40 @@ The app will have three layers:
 
 1. UI layer: React pages and components for auth state, sync status, account controls, settings, and current dashboard features.
 2. Application data layer: a local-first dashboard hook that writes immediately to local state and LocalStorage, then queues or triggers cloud sync when the user is authenticated.
-3. Backend adapter layer: Supabase client, auth service, cloud repository, migration SQL, and mapping functions between domain objects and database rows.
+3. Backend adapter layer: CloudBase client, auth service, cloud repository, SQL schema, and mapping functions between domain objects and database rows.
 
-Existing synchronous storage should not be replaced by direct Supabase calls inside UI components. The current repository abstraction must evolve into an async-capable local-first repository or a separate sync manager. UI actions should continue to feel instant, while cloud writes happen through a controlled sync path.
+Existing synchronous storage should not be replaced by direct CloudBase calls inside UI components. The current repository abstraction must evolve into an async-capable local-first repository or a separate sync manager. UI actions should continue to feel instant, while cloud writes happen through a controlled sync path.
+
+## CloudBase Setup
+
+Use CloudBase PG mode, not traditional document-database mode.
+
+Required CloudBase console setup:
+
+- Create a CloudBase environment in PG mode.
+- Enable email/password or username/password authentication according to CloudBase's current auth configuration.
+- Generate a Publishable Key for Web SDK access.
+- Add local development and deployment origins to the CloudBase security source list.
+- Configure the environment region, expected first choice `ap-shanghai`.
+- Keep CloudBase billing in RMB-priced plans.
+
+Frontend environment variables:
+
+- `VITE_CLOUDBASE_ENV_ID`
+- `VITE_CLOUDBASE_REGION`
+- `VITE_CLOUDBASE_ACCESS_KEY`
+
+No Tencent SecretId, SecretKey, admin token, service role key, or manager credential may be committed to frontend code, `.env.example`, README examples, tests, screenshots, or logs.
 
 ## Auth Flow
 
-Use Supabase email/password Auth.
+Use CloudBase Auth through `@cloudbase/js-sdk`.
 
 - Guest user opens the app and can use all local dashboard features.
 - User clicks account or sync control and opens an auth panel.
 - User registers with email and password.
 - User logs in with email and password.
-- App restores Supabase session on refresh through the Supabase client.
+- App restores CloudBase session on refresh through the CloudBase client.
 - User can log out; cloud data remains remote, local cache remains available.
 
 For phase one, registration is open. A `profiles.status` value still exists from day one:
@@ -61,7 +85,9 @@ The first phase sets every new profile to `active`. Later tightening can change 
 
 ## Data Model
 
-Use normalized Supabase tables instead of one JSON blob because the app already has distinct domain entities and needs future analytics.
+Use normalized PostgreSQL tables instead of one JSON blob because the app already has distinct domain entities and needs future analytics.
+
+All user-owned tables use `user_id uuid not null default auth.uid()` unless CloudBase PG requires a different UUID expression in current docs. The implementation must verify the exact CloudBase PG auth UID function before applying SQL.
 
 ### profiles
 
@@ -123,6 +149,7 @@ Add a unique index on `(user_id, record_date)` for active records.
 - `user_id uuid not null references auth.users(id) on delete cascade`
 - `record_date date not null`
 - `section text not null`
+- `source text not null`
 - `planned_minutes integer not null`
 - `actual_minutes integer not null`
 - `overtime_minutes integer not null`
@@ -148,21 +175,38 @@ Primary key: `(user_id, achievement_id)`.
 
 ## RLS And Security
 
-Every public table must enable Row Level Security.
+Every public app table must enable Row Level Security.
 
-Policies must use `TO authenticated` and an ownership predicate:
+Policies must use CloudBase PG's authenticated role model and an ownership predicate:
 
-- Select: user can read rows where `auth.uid() = user_id`.
-- Insert: user can insert rows only where `auth.uid() = user_id`.
-- Update: user can update rows where `auth.uid() = user_id`, and `WITH CHECK` must also require `auth.uid() = user_id`.
+- Select: user can read rows where the row `user_id` equals the current authenticated user id.
+- Insert: user can insert rows only where the row `user_id` equals the current authenticated user id.
+- Update: user can update rows where the row `user_id` equals the current authenticated user id, and `WITH CHECK` must also require the same ownership.
 - Delete: prefer soft delete from the client. Hard delete policies may be added only for owned rows.
 
-Frontend code must only use the Supabase publishable key and project URL from Vite environment variables:
+The implementation must verify the exact CloudBase PG role names and auth UID expression against current CloudBase docs before writing SQL. The intended policy shape follows CloudBase PG's documented pattern:
 
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_PUBLISHABLE_KEY`
+```sql
+alter table my_table enable row level security;
 
-Never place a service role key in frontend code, `.env.example`, README examples, tests, screenshots, or committed logs.
+create policy select_own on my_table
+  for select
+  to authenticated
+  using (user_id = (select auth.uid()));
+
+create policy insert_own on my_table
+  for insert
+  to authenticated
+  with check (user_id = (select auth.uid()));
+
+create policy update_own on my_table
+  for update
+  to authenticated
+  using (user_id = (select auth.uid()))
+  with check (user_id = (select auth.uid()));
+```
+
+Frontend code must use only CloudBase Web SDK publishable configuration. Manager SDK credentials and Tencent Cloud SecretId/SecretKey belong only in CloudBase console, CLI, or server-side environments, never in the Vite app.
 
 ## Sync Rules
 
@@ -180,7 +224,7 @@ When a user logs in and has local data:
 
 1. Load local app state.
 2. Load cloud state for the authenticated user.
-3. If cloud state is empty, upload local state after replacing local guest `userId` with the Supabase `auth.uid()`.
+3. If cloud state is empty, upload local state after replacing local guest `userId` with the CloudBase authenticated user id.
 4. If cloud state already exists, merge by entity key and `updatedAt`.
 5. Save the merged state locally and remotely.
 
@@ -214,7 +258,7 @@ Add account and sync controls without turning the dashboard into a marketing pag
 - Add auth panel with sign in, sign up, password validation, and error messages.
 - Add logout action.
 - Add local-to-cloud import messaging after first login.
-- Add settings copy that explains local-only mode versus cloud sync.
+- Add settings copy that explains local-only mode versus CloudBase cloud sync.
 - Keep existing Chinese/English toggle and add translations for all new visible text.
 
 Mobile and desktop layouts must be checked. Auth controls must not overlap navigation, timer controls, or dashboard cards.
@@ -223,16 +267,16 @@ Mobile and desktop layouts must be checked. Auth controls must not overlap navig
 
 Create:
 
-- `src/services/supabase/supabaseClient.ts`
-- `src/services/supabase/authService.ts`
-- `src/services/supabase/cloudRepository.ts`
-- `src/services/supabase/cloudMappers.ts`
+- `src/services/cloudbase/cloudbaseClient.ts`
+- `src/services/cloudbase/authService.ts`
+- `src/services/cloudbase/cloudRepository.ts`
+- `src/services/cloudbase/cloudMappers.ts`
 - `src/services/sync/syncTypes.ts`
 - `src/services/sync/syncManager.ts`
 - `src/hooks/useAuthSession.ts`
 - `src/components/auth/AuthPanel.tsx`
 - `src/components/auth/AuthPanel.test.tsx`
-- `supabase/migrations/<generated>-cloud-sync-auth.sql`
+- `cloudbase/sql/cloud-sync-auth.sql`
 - `.env.example`
 
 Modify:
@@ -272,19 +316,21 @@ Before commit:
 - Manually verify:
   - guest mode still works
   - sign up form validation works
-  - login works with configured Supabase project
+  - login works with configured CloudBase PG environment
   - logout works
   - local data imports after first login
   - data survives refresh
   - second browser/device session can load cloud data
   - offline or failed sync does not lose local changes
 
-Supabase verification:
+CloudBase verification:
 
+- Confirm the CloudBase environment uses PG mode.
+- Confirm the selected CloudBase plan is RMB-priced.
 - Confirm all public app tables have RLS enabled.
 - Confirm users cannot read another user's records.
 - Confirm users cannot insert or update rows for another `user_id`.
-- Confirm no service role key appears in committed files.
+- Confirm no SecretId, SecretKey, manager credential, or service token appears in committed files.
 
 GitHub verification:
 
@@ -298,11 +344,12 @@ GitHub verification:
 - A new user can register with email/password.
 - An existing user can log in and out.
 - A guest can use the dashboard without an account.
-- Logged-in user data syncs to Supabase and restores after refresh.
+- Logged-in user data syncs to CloudBase PG and restores after refresh.
 - A second authenticated session can load the same user's dashboard data.
 - Local data is not lost during first login import.
 - RLS prevents cross-user data access.
 - UI displays sync/auth state clearly in Chinese and English.
+- Backend service can be paid in RMB.
 - Desktop and mobile layouts have no obvious text overlap, button overflow, or navigation breakage.
 - Build, unit tests, and e2e tests pass.
 - First-version unused code is removed based on evidence, not guesswork.
@@ -310,9 +357,10 @@ GitHub verification:
 
 ## References
 
-- Supabase Auth: https://supabase.com/docs/guides/auth
-- Supabase password auth: https://supabase.com/docs/guides/auth/passwords
-- Supabase JavaScript sign up: https://supabase.com/docs/reference/javascript/auth-signup
-- Supabase JavaScript password sign in: https://supabase.com/docs/reference/javascript/auth-signinwithpassword
-- Supabase Row Level Security: https://supabase.com/docs/guides/database/postgres/row-level-security
-- Supabase pricing: https://supabase.com/pricing
+- CloudBase pricing: https://cloud.tencent.cn/document/product/876/75213
+- CloudBase Auth v2: https://docs.cloudbase.net/authentication-v2/auth/introduce
+- CloudBase email login: https://docs.cloudbase.net/authentication/method/email-login
+- CloudBase PG auth: https://docs.cloudbase.net/authentication-v2/auth/auth-pg
+- CloudBase PG RLS permissions: https://docs.cloudbase.net/database/configuration/db/postgresql/data-permission
+- CloudBase PG quickstart: https://docs.cloudbase.net/database/configuration/db/postgresql/quickstart
+- CloudBase PG Web RDB fetch: https://docs.cloudbase.net/api-reference/webv2/postgresql/fetch
