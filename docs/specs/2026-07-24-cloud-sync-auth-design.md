@@ -12,7 +12,7 @@ Aliyun is not needed for this phase. Revisit Aliyun only when the project needs 
 
 ## Goals
 
-- Add email/password registration, login, logout, and session restore.
+- Add account/password registration, login, logout, and session restore.
 - Preserve guest mode with the existing LocalStorage data.
 - Import existing local data into the authenticated user's cloud account after first login.
 - Sync targets, daily records, timer sessions, and achievements across devices.
@@ -50,7 +50,7 @@ Use CloudBase PG mode, not traditional document-database mode.
 Required CloudBase console setup:
 
 - Create a CloudBase environment in PG mode.
-- Enable email/password or username/password authentication according to CloudBase's current auth configuration.
+- Enable username/password authentication according to CloudBase's current auth configuration.
 - Generate a Publishable Key for Web SDK access.
 - Add local development and deployment origins to the CloudBase security source list.
 - Configure the environment region, expected first choice `ap-shanghai`.
@@ -66,12 +66,12 @@ No Tencent SecretId, SecretKey, admin token, service role key, or manager creden
 
 ## Auth Flow
 
-Use CloudBase Auth through `@cloudbase/js-sdk`.
+Use CloudBase Auth v2 through `@cloudbase/js-sdk`. The MVP uses username/password because CloudBase's current v2 guidance treats username/password as the canonical password login path. Email login is left for a later phase because CloudBase's email/password documentation points at the older v1 authentication flow and may require email sender configuration.
 
 - Guest user opens the app and can use all local dashboard features.
 - User clicks account or sync control and opens an auth panel.
-- User registers with email and password.
-- User logs in with email and password.
+- User registers with account name and password.
+- User logs in with account name and password.
 - App restores CloudBase session on refresh through the CloudBase client.
 - User can log out; cloud data remains remote, local cache remains available.
 
@@ -92,7 +92,7 @@ All user-owned tables use `user_id uuid not null default auth.uid()` unless Clou
 ### profiles
 
 - `user_id uuid primary key references auth.users(id) on delete cascade`
-- `email text`
+- `account_name text`
 - `status text not null default 'active'`
 - `display_name text`
 - `created_at timestamptz not null default now()`
@@ -315,7 +315,7 @@ Before commit:
 - Check browser console for errors.
 - Manually verify:
   - guest mode still works
-  - sign up form validation works
+  - account/password sign up form validation works
   - login works with configured CloudBase PG environment
   - logout works
   - local data imports after first login
@@ -341,7 +341,7 @@ GitHub verification:
 
 ## Acceptance Criteria
 
-- A new user can register with email/password.
+- A new user can register with account/password.
 - An existing user can log in and out.
 - A guest can use the dashboard without an account.
 - Logged-in user data syncs to CloudBase PG and restores after refresh.
@@ -360,6 +360,7 @@ GitHub verification:
 - CloudBase pricing: https://cloud.tencent.cn/document/product/876/75213
 - CloudBase Auth v2: https://docs.cloudbase.net/authentication-v2/auth/introduce
 - CloudBase email login: https://docs.cloudbase.net/authentication/method/email-login
+- CloudBase username login: https://docs.cloudbase.net/authentication/method/username-login
 - CloudBase PG auth: https://docs.cloudbase.net/authentication-v2/auth/auth-pg
 - CloudBase PG RLS permissions: https://docs.cloudbase.net/database/configuration/db/postgresql/data-permission
 - CloudBase PG quickstart: https://docs.cloudbase.net/database/configuration/db/postgresql/quickstart
