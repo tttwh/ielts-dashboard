@@ -6,6 +6,8 @@ import {
   createEmptyDailyRecord,
   recalculateDailyRecordProgress
 } from "../domain/progress";
+import type { SyncManager } from "../services/sync/syncManager";
+import type { SyncResult } from "../services/sync/syncTypes";
 import { createMemoryRepository } from "../services/storage/appRepository";
 import { useDashboardData } from "./useDashboardData";
 
@@ -13,6 +15,44 @@ const today = "2026-07-22";
 const now = "2026-07-22T08:00:00.000Z";
 
 const createState = (): AppState => createDefaultAppState("2026-07-22T00:00:00.000Z");
+
+const syncedResult = (state: AppState): SyncResult => ({
+  state,
+  syncState: {
+    mode: "synced",
+    message: null,
+    lastSyncedAt: now
+  }
+});
+
+const withUserId = (state: AppState, userId: string): AppState => ({
+  ...state,
+  profile: {
+    ...state.profile,
+    userId,
+    syncStatus: "synced"
+  },
+  dailyGoals: {
+    ...state.dailyGoals,
+    userId,
+    syncStatus: "synced"
+  },
+  records: state.records.map((record) => ({
+    ...record,
+    userId,
+    syncStatus: "synced"
+  })),
+  timerSessions: state.timerSessions.map((session) => ({
+    ...session,
+    userId,
+    syncStatus: "synced"
+  })),
+  achievements: state.achievements.map((achievement) => ({
+    ...achievement,
+    userId,
+    syncStatus: "synced"
+  }))
+});
 
 describe("useDashboardData", () => {
   beforeEach(() => {
@@ -278,5 +318,126 @@ describe("useDashboardData", () => {
       ])
     );
     expect(repo.loadAppState().achievements[0].unlockedAt).toBe(now);
+  });
+
+  it("keeps guest sync behavior unchanged when no sync manager is provided", async () => {
+    const repo = createMemoryRepository();
+    const { result } = renderHook(() => useDashboardData(repo, today));
+
+    expect(result.current.syncState).toEqual({
+      mode: "guest",
+      message: null,
+      lastSyncedAt: null
+    });
+
+    await act(async () => {
+      await result.current.syncNow("cloud-user-1", "weihao_01");
+    });
+
+    expect(result.current.syncState).toEqual({
+      mode: "guest",
+      message: null,
+      lastSyncedAt: null
+    });
+    expect(result.current.state.profile.userId).toBe("local-user");
+
+    act(() => {
+      result.current.updateTodayRecord({ words: 100 });
+    });
+
+    expect(result.current.todayRecord.words).toBe(100);
+    expect(repo.loadAppState().records[0].words).toBe(100);
+  });
+
+  it("imports or loads cloud state on first sync for a cloud user", async () => {
+    const repo = createMemoryRepository();
+    const importOrLoad = vi.fn(async (_userId: string, localState: AppState) =>
+      syncedResult(withUserId(localState, "cloud-user-1"))
+    );
+    const push = vi.fn<SyncManager["push"]>();
+    const syncManager: SyncManager = {
+      importOrLoad,
+      push
+    };
+    const { result } = renderHook(() => useDashboardData(repo, today, syncManager));
+
+    await act(async () => {
+      await result.current.syncNow("cloud-user-1", "weihao_01");
+    });
+
+    expect(importOrLoad).toHaveBeenCalledWith(
+      "cloud-user-1",
+      expect.objectContaining({
+        profile: expect.objectContaining({ userId: "local-user" })
+      }),
+      "weihao_01"
+    );
+    expect(push).not.toHaveBeenCalled();
+    expect(result.current.state.profile.userId).toBe("cloud-user-1");
+    expect(repo.loadAppState()).toEqual(result.current.state);
+    expect(result.current.syncState).toEqual({
+      mode: "synced",
+      message: null,
+      lastSyncedAt: now
+    });
+  });
+
+  it("keeps local writes local and pushes the latest state on later sync", async () => {
+    const repo = createMemoryRepository();
+    let resolvePush: (result: SyncResult) => void = () => undefined;
+    const pushPromise = new Promise<SyncResult>((resolve) => {
+      resolvePush = resolve;
+    });
+    const importOrLoad = vi.fn(async (_userId: string, localState: AppState) =>
+      syncedResult(withUserId(localState, "cloud-user-1"))
+    );
+    const push = vi.fn<SyncManager["push"]>(() => pushPromise);
+    const syncManager: SyncManager = {
+      importOrLoad,
+      push
+    };
+    const { result } = renderHook(() => useDashboardData(repo, today, syncManager));
+
+    await act(async () => {
+      await result.current.syncNow("cloud-user-1", "weihao_01");
+    });
+
+    act(() => {
+      result.current.updateTodayRecord({ words: 100 });
+    });
+
+    expect(push).not.toHaveBeenCalled();
+    expect(result.current.syncState.mode).toBe("offline");
+    expect(result.current.todayRecord.words).toBe(100);
+
+    let syncPromise: Promise<void> | null = null;
+    await act(async () => {
+      syncPromise = result.current.syncNow("cloud-user-1", "weihao_01");
+    });
+
+    expect(push).toHaveBeenCalledWith(
+      expect.objectContaining({
+        records: [
+          expect.objectContaining({
+            userId: "cloud-user-1",
+            words: 100
+          })
+        ]
+      }),
+      "weihao_01"
+    );
+    expect(result.current.syncState.mode).toBe("syncing");
+
+    const pushedState = push.mock.calls[0][0];
+    const pushedResult = syncedResult(withUserId(pushedState, "cloud-user-1"));
+
+    await act(async () => {
+      resolvePush(pushedResult);
+      await syncPromise;
+    });
+
+    expect(result.current.state).toEqual(pushedResult.state);
+    expect(repo.loadAppState()).toEqual(pushedResult.state);
+    expect(result.current.syncState).toEqual(pushedResult.syncState);
   });
 });

@@ -20,6 +20,8 @@ import type {
   AppState,
   AppStateMutation
 } from "../services/storage/storageTypes";
+import type { SyncManager } from "../services/sync/syncManager";
+import type { SyncState } from "../services/sync/syncTypes";
 
 export type ProfileUpdate = Partial<
   Omit<UserProfile, "userId" | "sectionTargets" | "createdAt" | "updatedAt" | "syncStatus">
@@ -55,10 +57,12 @@ export type DailyRecordUpdate = Partial<
 export interface DashboardData {
   state: AppState;
   todayRecord: DailyRecord;
+  syncState: SyncState;
   updateProfile(update: ProfileUpdate): void;
   updateDailyGoals(update: DailyGoalsUpdate): void;
   updateTodayRecord(update: DailyRecordUpdate): void;
   addTimerSession(session: TimerSession): void;
+  syncNow(userId: string, accountName: string | null): Promise<void>;
   latestUnlockedAchievementId: string | null;
   unlockAchievementsIfNeeded(): void;
 }
@@ -119,14 +123,49 @@ const latestNewUnlockId = (previous: Achievement[], next: Achievement[]) => {
   );
 };
 
+const guestSyncState = (): SyncState => ({
+  mode: "guest",
+  message: null,
+  lastSyncedAt: null
+});
+
+const offlineSyncState = (lastSyncedAt: string | null): SyncState => ({
+  mode: "offline",
+  message: "Local changes are saved on this device.",
+  lastSyncedAt
+});
+
+const syncingSyncState = (lastSyncedAt: string | null): SyncState => ({
+  mode: "syncing",
+  message: null,
+  lastSyncedAt
+});
+
+const errorSyncState = (error: unknown, lastSyncedAt: string | null): SyncState => ({
+  mode: "error",
+  message: error instanceof Error ? error.message : String(error),
+  lastSyncedAt
+});
+
 export function useDashboardData(
   repository?: AppRepository,
-  today: string = todayKey()
+  today: string = todayKey(),
+  syncManager?: SyncManager
 ): DashboardData {
   const repo = useMemo(() => repository ?? createLocalStorageRepository(), [repository]);
   const [state, setState] = useState<AppState>(() => repo.loadAppState());
+  const [syncState, setSyncState] = useState<SyncState>(() =>
+    syncManager ? offlineSyncState(null) : guestSyncState()
+  );
   const [latestUnlockedAchievementId, setLatestUnlockedAchievementId] = useState<string | null>(null);
   const stateRef = useRef(state);
+  const syncStateRef = useRef(syncState);
+  const syncedUserIdRef = useRef<string | null>(null);
+
+  const commitSyncState = useCallback((nextSyncState: SyncState) => {
+    syncStateRef.current = nextSyncState;
+    setSyncState(nextSyncState);
+  }, []);
 
   const applyAchievementEvaluation = useCallback(
     (candidateState: AppState, now: string, previousAchievements: Achievement[]) => {
@@ -167,6 +206,18 @@ export function useDashboardData(
     setState(nextState);
   }, [applyAchievementEvaluation, repo]);
 
+  useEffect(() => {
+    if (!syncManager) {
+      syncedUserIdRef.current = null;
+      commitSyncState(guestSyncState());
+      return;
+    }
+
+    if (syncStateRef.current.mode === "guest") {
+      commitSyncState(offlineSyncState(syncStateRef.current.lastSyncedAt));
+    }
+  }, [commitSyncState, syncManager]);
+
   const commitState = useCallback(
     (mutation: AppStateMutation) => {
       const currentState = stateRef.current;
@@ -183,12 +234,15 @@ export function useDashboardData(
 
       stateRef.current = nextState;
       repo.saveAppState(nextState);
+      if (syncManager) {
+        commitSyncState(offlineSyncState(syncStateRef.current.lastSyncedAt));
+      }
       if (latestUnlockId) {
         setLatestUnlockedAchievementId(latestUnlockId);
       }
       setState(nextState);
     },
-    [applyAchievementEvaluation, repo]
+    [applyAchievementEvaluation, commitSyncState, repo, syncManager]
   );
 
   const todayRecord = useMemo(() => {
@@ -340,13 +394,50 @@ export function useDashboardData(
     commitState((current) => current);
   }, [commitState]);
 
+  const syncNow = useCallback(
+    async (userId: string, accountName: string | null) => {
+      if (!syncManager) {
+        return;
+      }
+
+      const lastSyncedAt = syncStateRef.current.lastSyncedAt;
+      const localState = stateRef.current;
+      const shouldImportOrLoad =
+        syncedUserIdRef.current !== userId ||
+        localState.profile.userId !== userId ||
+        syncStateRef.current.mode === "guest";
+
+      commitSyncState(syncingSyncState(lastSyncedAt));
+
+      try {
+        const result = shouldImportOrLoad
+          ? await syncManager.importOrLoad(userId, localState, accountName)
+          : await syncManager.push(localState, accountName);
+
+        stateRef.current = result.state;
+        repo.saveAppState(result.state);
+        setState(result.state);
+        commitSyncState(result.syncState);
+
+        if (result.syncState.mode === "synced") {
+          syncedUserIdRef.current = userId;
+        }
+      } catch (error) {
+        commitSyncState(errorSyncState(error, lastSyncedAt));
+      }
+    },
+    [commitSyncState, repo, syncManager]
+  );
+
   return {
     state,
     todayRecord,
+    syncState,
     updateProfile,
     updateDailyGoals,
     updateTodayRecord,
     addTimerSession,
+    syncNow,
     latestUnlockedAchievementId,
     unlockAchievementsIfNeeded
   };
