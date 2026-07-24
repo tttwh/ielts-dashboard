@@ -153,7 +153,7 @@ const createCloudSelectData = (state = createFilledState()): FakeTableData => {
   return {
     profiles: [rows.profile],
     user_settings: [rows.userSettings],
-    goals: [{ ...rows.goals, goal_id: "goal-1" }],
+    goals: [rows.goals],
     daily_records: rows.records,
     timer_sessions: rows.timerSessions,
     achievements: rows.achievements
@@ -233,7 +233,7 @@ describe("createCloudRepository", () => {
       {
         tableName: "goals",
         values: rows.goals,
-        onConflict: "goal_id"
+        onConflict: "user_id"
       },
       {
         tableName: "daily_records",

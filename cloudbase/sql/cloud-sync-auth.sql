@@ -18,8 +18,7 @@ create table if not exists public.user_settings (
 );
 
 create table if not exists public.goals (
-  goal_id uuid primary key default gen_random_uuid(),
-  user_id varchar(64) not null references auth.users(id),
+  user_id varchar(64) primary key references auth.users(id),
   overall_band numeric not null,
   listening_band numeric not null,
   speaking_band numeric not null,
@@ -84,10 +83,6 @@ create table if not exists public.achievements (
 
 create unique index if not exists daily_records_user_date_active_idx
   on public.daily_records (user_id, record_date)
-  where deleted_at is null;
-
-create unique index if not exists goals_one_active_per_user_idx
-  on public.goals (user_id)
   where deleted_at is null;
 
 alter table public.profiles enable row level security;

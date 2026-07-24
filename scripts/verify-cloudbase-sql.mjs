@@ -27,6 +27,13 @@ const forbidden = [
 
 const missing = [];
 
+const getCreateTableBody = (tableName) => {
+  const match = sql.match(
+    new RegExp(`create table if not exists public\\.${tableName} \\(([\\s\\S]*?)\\n\\);`, "i"),
+  );
+  return match?.[1] ?? "";
+};
+
 for (const table of tables) {
   if (!sql.includes(`create table if not exists public.${table}`)) {
     missing.push(`${table} table`);
@@ -58,6 +65,19 @@ if (!sql.includes("references auth.users(id)")) {
 
 if (/\buser_id\s+uuid\b/i.test(sql)) {
   missing.push("stale uuid user_id column");
+}
+
+const goalsTable = getCreateTableBody("goals");
+if (!/\buser_id\s+varchar\(64\)\s+primary key\s+references auth\.users\(id\)/i.test(goalsTable)) {
+  missing.push("goals user_id primary key");
+}
+
+if (/\bgoal_id\b/i.test(goalsTable)) {
+  missing.push("stale goals goal_id column");
+}
+
+if (/goals_one_active_per_user_idx/i.test(sql)) {
+  missing.push("stale goals partial user index");
 }
 
 if (!sql.includes("with check (user_id = (select auth.uid()))")) {

@@ -25,7 +25,6 @@ export interface UserSettingsRow {
 }
 
 export interface GoalsRow {
-  goal_id?: string;
   user_id: string;
   overall_band: number;
   listening_band: number;

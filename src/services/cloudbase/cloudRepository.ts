@@ -89,7 +89,7 @@ export function createCloudRepository(rdb: CloudBaseRdbClient): CloudRepository 
         },
         {
           tableName: "goals",
-          result: asUnknownResult(rdb.from<GoalsRow>("goals").upsert(goals, { onConflict: "goal_id" }))
+          result: asUnknownResult(rdb.from<GoalsRow>("goals").upsert(goals, { onConflict: "user_id" }))
         },
         {
           tableName: "daily_records",
