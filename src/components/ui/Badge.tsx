@@ -8,10 +8,10 @@ interface BadgeProps {
 }
 
 const tones: Record<BadgeTone, string> = {
-  neutral: "border-line bg-white text-muted",
-  blue: "border-blue-200 bg-blue-50 text-ielts-blue",
-  purple: "border-purple-200 bg-purple-50 text-ielts-purple",
-  success: "border-emerald-200 bg-emerald-50 text-emerald-700"
+  neutral: "border-white/70 bg-white/60 text-muted",
+  blue: "border-blue-200/80 bg-blue-50/80 text-ielts-blue",
+  purple: "border-purple-200/80 bg-purple-50/80 text-ielts-purple",
+  success: "border-emerald-200/80 bg-emerald-50/80 text-emerald-700"
 };
 
 export function Badge({ children, tone = "neutral" }: BadgeProps) {

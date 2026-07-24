@@ -20,6 +20,22 @@ export interface I18nText {
     levelValue(level: number): string;
     streakDays(days: number): string;
   };
+  navigation: {
+    regionLabel: string;
+    consoleTitle: string;
+    viewLabel(view: string): string;
+    viewDescription(view: string): string;
+    settings: string;
+  };
+  overview: {
+    title: string;
+    description: string;
+    todayFocus: string;
+    sectionBalance: string;
+    recentProgress: string;
+    rewardPreview: string;
+    openView(viewLabel: string): string;
+  };
   shell: {
     sidebarLabel: string;
   };
@@ -103,6 +119,18 @@ export interface I18nText {
     achievementName(id: Achievement["achievementId"], fallback: string): string;
     achievementDescription(id: Achievement["achievementId"], fallback: string): string;
   };
+  settings: {
+    title: string;
+    description: string;
+    languageTitle: string;
+    languageDescription: string;
+    targetsTitle: string;
+    storageTitle: string;
+    storageDescription: string;
+    localStateKey: string;
+    languageKey: string;
+    cloudReady: string;
+  };
   units: {
     band: string;
     words: string;
@@ -150,6 +178,33 @@ const achievementDescription =
   (language: Language) => (id: Achievement["achievementId"], fallback: string) =>
     achievementText[language][id]?.[1] ?? fallback;
 
+const navigationText = {
+  en: {
+    overview: ["Overview", "Today goals, score targets, streak, and study pulse."],
+    checkin: ["Check-in", "Record today's core IELTS practice tasks."],
+    timer: ["Timer", "Track focused Listening, Speaking, Reading, and Writing time."],
+    progress: ["Progress", "Review the latest 60 local study days."],
+    rewards: ["Rewards", "Follow XP, levels, and achievement unlocks."],
+    settings: ["Settings", "Adjust targets, language, and local data preferences."]
+  },
+  zh: {
+    overview: ["总览", "查看今日目标、分数目标、连续学习和学习状态。"],
+    checkin: ["打卡", "记录今天的雅思核心练习任务。"],
+    timer: ["计时", "记录听、说、读、写四科专注学习时长。"],
+    progress: ["进度", "查看最近 60 天本地学习记录。"],
+    rewards: ["奖励", "查看经验值、等级和成就解锁。"],
+    settings: ["设置", "调整目标、语言和本地数据偏好。"]
+  }
+} as const;
+
+const navigationLabel =
+  (language: Language) => (view: string) =>
+    navigationText[language][view as keyof (typeof navigationText)["en"]]?.[0] ?? view;
+
+const navigationDescription =
+  (language: Language) => (view: string) =>
+    navigationText[language][view as keyof (typeof navigationText)["en"]]?.[1] ?? "";
+
 export const translations: Record<Language, I18nText> = {
   en: {
     languageToggle: {
@@ -173,6 +228,22 @@ export const translations: Record<Language, I18nText> = {
       levelLabel: "Level",
       levelValue: (level) => `Level ${level}`,
       streakDays: (days) => `${days} ${days === 1 ? "day" : "days"}`
+    },
+    navigation: {
+      regionLabel: "Dashboard sections",
+      consoleTitle: "Prep Console",
+      viewLabel: navigationLabel("en"),
+      viewDescription: navigationDescription("en"),
+      settings: "Settings"
+    },
+    overview: {
+      title: "Overview",
+      description: "A compact command center for today's IELTS preparation.",
+      todayFocus: "Today focus",
+      sectionBalance: "Section balance",
+      recentProgress: "Recent progress",
+      rewardPreview: "Reward preview",
+      openView: (viewLabel) => `Open ${viewLabel}`
     },
     shell: {
       sidebarLabel: "Compact dashboard panels"
@@ -257,6 +328,18 @@ export const translations: Record<Language, I18nText> = {
       achievementName: achievementName("en"),
       achievementDescription: achievementDescription("en")
     },
+    settings: {
+      title: "Settings",
+      description: "Control targets, language, and local-first storage.",
+      languageTitle: "Language",
+      languageDescription: "Switch visible dashboard copy between Chinese and English.",
+      targetsTitle: "Targets and daily goals",
+      storageTitle: "Local data",
+      storageDescription: "This version stores study data in the current browser.",
+      localStateKey: "Study data key: ielts-dashboard-state",
+      languageKey: "Language key: ielts-dashboard-language",
+      cloudReady: "Cloud sync is planned, not active."
+    },
     units: {
       band: "band",
       words: "words",
@@ -288,6 +371,22 @@ export const translations: Record<Language, I18nText> = {
       levelLabel: "等级",
       levelValue: (level) => `${level} 级`,
       streakDays: (days) => `${days} 天`
+    },
+    navigation: {
+      regionLabel: "看板页面",
+      consoleTitle: "备考控制台",
+      viewLabel: navigationLabel("zh"),
+      viewDescription: navigationDescription("zh"),
+      settings: "设置"
+    },
+    overview: {
+      title: "总览",
+      description: "集中查看今天的雅思备考状态。",
+      todayFocus: "今日重点",
+      sectionBalance: "四科均衡",
+      recentProgress: "近期进度",
+      rewardPreview: "奖励预览",
+      openView: (viewLabel) => `打开${viewLabel}`
     },
     shell: {
       sidebarLabel: "紧凑看板侧栏"
@@ -374,6 +473,18 @@ export const translations: Record<Language, I18nText> = {
       locked: "未解锁",
       achievementName: achievementName("zh"),
       achievementDescription: achievementDescription("zh")
+    },
+    settings: {
+      title: "设置",
+      description: "管理目标、语言和本地优先数据。",
+      languageTitle: "语言",
+      languageDescription: "在中文和英文看板文案之间切换。",
+      targetsTitle: "目标和每日任务",
+      storageTitle: "本地数据",
+      storageDescription: "当前版本会把学习数据保存在当前浏览器。",
+      localStateKey: "学习数据 key：ielts-dashboard-state",
+      languageKey: "语言 key：ielts-dashboard-language",
+      cloudReady: "云同步已规划，当前尚未启用。"
     },
     units: {
       band: "分",

@@ -35,9 +35,9 @@ function AchievementChip({
 }: AchievementChipProps) {
   const Icon = isUnlocked ? Award : LockKeyhole;
   const unlockedClasses = isLatest
-    ? "border-purple-300 bg-purple-50 text-ielts-purple reward-badge--pulse"
-    : "border-blue-200 bg-blue-50 text-ielts-blue";
-  const lockedClasses = "border-line bg-surface text-muted opacity-70";
+    ? "border-purple-300/90 bg-purple-50/80 text-ielts-purple reward-badge--pulse"
+    : "border-blue-200/90 bg-blue-50/80 text-ielts-blue";
+  const lockedClasses = "border-white/70 bg-white/45 text-muted opacity-75";
 
   return (
     <span
@@ -74,10 +74,10 @@ export function RewardsPanel({
   return (
     <section
       aria-labelledby="rewards-heading"
-      className="min-w-0 rounded-[8px] border border-line bg-white shadow-sm"
+      className="glass-panel min-w-0"
       data-testid="rewards-panel"
     >
-      <div className="flex min-w-0 items-start justify-between gap-3 border-b border-line p-4">
+      <div className="flex min-w-0 items-start justify-between gap-3 border-b border-white/70 p-4">
         <div className="min-w-0">
           <h2 id="rewards-heading" className="text-base font-semibold leading-6 text-ink">
             {t.rewards.title}
@@ -86,7 +86,7 @@ export function RewardsPanel({
             {t.rewards.levelValue(level)}
           </p>
         </div>
-        <div className="shrink-0 rounded-[6px] border border-blue-100 bg-blue-50 px-2.5 py-1 text-right">
+        <div className="shrink-0 rounded-[6px] border border-blue-100/80 bg-blue-50/80 px-2.5 py-1 text-right">
           <p className="font-mono text-xs font-semibold text-ielts-blue">
             {currentLevelXp}/{xpPerLevel} {t.units.xp}
           </p>
@@ -110,7 +110,7 @@ export function RewardsPanel({
 
         <div
           aria-live="polite"
-          className="mt-3 flex min-w-0 items-center gap-2 rounded-[6px] border border-purple-100 bg-purple-50 px-3 py-2"
+          className="mt-3 flex min-w-0 items-center gap-2 rounded-[6px] border border-purple-100/80 bg-purple-50/70 px-3 py-2"
         >
           <Sparkles aria-hidden="true" className="shrink-0 text-ielts-purple" size={15} />
           <div className="min-w-0">

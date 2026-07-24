@@ -27,14 +27,22 @@ const test = base.extend<{ consoleErrorWatcher: void }>({
 async function loadDashboard(page: Page) {
   await page.clock.install({ time: FIXED_NOW });
   await page.goto("/");
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+}
+
+async function openView(page: Page, label: string) {
+  await page.getByRole("link", { name: label }).click();
 }
 
 async function expectNoHorizontalBodyOverflow(page: Page) {
-  const hasOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+  const hasOverflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth
+  );
   expect(hasOverflow).toBe(false);
 }
 
-test("dashboard loads", async ({ page }) => {
+test("dashboard loads into overview with six-page navigation", async ({ page }) => {
   await loadDashboard(page);
 
   await expect(page.getByRole("heading", { name: "IELTS Prep Dashboard" })).toBeVisible();
@@ -42,9 +50,34 @@ test("dashboard loads", async ({ page }) => {
     "aria-valuenow",
     "0"
   );
-  await expect(page.getByRole("region", { name: "Daily Check-In" })).toBeVisible();
-  await expect(page.getByRole("region", { name: "Study Timer" })).toBeVisible();
-  await expect(page.getByRole("region", { name: "Target dashboard" })).toBeVisible();
+  await expect(page.getByTestId("page-overview")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Overview" })).toHaveAttribute(
+    "aria-current",
+    "page"
+  );
+
+  for (const label of ["Check-in", "Timer", "Progress", "Rewards", "Settings"]) {
+    await expect(page.getByRole("link", { name: label })).toBeVisible();
+  }
+
+  await expect(page.getByTestId("daily-checkin")).toHaveCount(0);
+});
+
+test("navigation switches pages and writes hash routes", async ({ page }) => {
+  await loadDashboard(page);
+
+  await openView(page, "Timer");
+  await expect(page).toHaveURL(/#timer$/);
+  await expect(page.getByTestId("page-timer")).toBeVisible();
+  await expect(page.getByTestId("study-timer-panel")).toBeVisible();
+
+  await openView(page, "Progress");
+  await expect(page).toHaveURL(/#progress$/);
+  await expect(page.getByTestId("history-heatmap")).toBeVisible();
+
+  await openView(page, "Rewards");
+  await expect(page).toHaveURL(/#rewards$/);
+  await expect(page.getByTestId("rewards-panel")).toBeVisible();
 });
 
 test("language toggle switches visible dashboard copy and survives reload", async ({ page }) => {
@@ -53,9 +86,7 @@ test("language toggle switches visible dashboard copy and survives reload", asyn
   await page.getByRole("button", { name: "中" }).click();
 
   await expect(page.getByRole("heading", { name: "雅思备考打卡看板" })).toBeVisible();
-  await expect(page.getByRole("region", { name: "每日打卡" })).toBeVisible();
-  await expect(page.getByRole("region", { name: "学习计时器" })).toBeVisible();
-  await expect(page.getByRole("region", { name: "目标看板" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "总览" })).toBeVisible();
   await expect(page.getByRole("progressbar", { name: "今日完成度" })).toHaveAttribute(
     "aria-valuenow",
     "0"
@@ -71,21 +102,24 @@ test("language toggle switches visible dashboard copy and survives reload", asyn
   await expect(page.getByRole("heading", { name: "IELTS Prep Dashboard" })).toBeVisible();
 });
 
-test("target score edit survives reload", async ({ page }) => {
+test("target score edit survives reload from settings", async ({ page }) => {
   await loadDashboard(page);
 
+  await openView(page, "Settings");
   const targetDashboard = page.getByTestId("target-dashboard");
   await targetDashboard.getByLabel("Total band").fill("8.0");
   await targetDashboard.getByLabel("Total band").blur();
 
   await page.reload();
 
+  await expect(page).toHaveURL(/#settings$/);
   await expect(page.getByTestId("target-dashboard").getByLabel("Total band")).toHaveValue("8.0");
 });
 
 test("daily check-in updates completion", async ({ page }) => {
   await loadDashboard(page);
 
+  await openView(page, "Check-in");
   const checkIn = page.getByTestId("daily-checkin");
   await checkIn.getByLabel("Words actual").fill("100");
 
@@ -96,33 +130,35 @@ test("daily check-in updates completion", async ({ page }) => {
   );
 });
 
-test("manual external time updates section minutes", async ({ page }) => {
+test("manual external time updates section minutes across pages", async ({ page }) => {
   await loadDashboard(page);
 
-  const checkInStudyTime = page.getByTestId("checkin-study-time-status");
-  await expect(checkInStudyTime).toContainText("Writing 0/45 min");
+  await openView(page, "Check-in");
+  await expect(page.getByTestId("checkin-study-time-status")).toContainText("Writing 0/45 min");
 
+  await openView(page, "Timer");
   const manualExternalTimeForm = page.getByTestId("manual-external-time-form");
   await manualExternalTimeForm.getByLabel("Manual section").selectOption("writing");
   await manualExternalTimeForm.getByLabel("Manual minutes").fill("15");
   await manualExternalTimeForm.getByRole("button", { name: /record external time/i }).click();
 
-  await expect(checkInStudyTime).toContainText("Writing 15/45 min");
+  await openView(page, "Check-in");
+  await expect(page.getByTestId("checkin-study-time-status")).toContainText("Writing 15/45 min");
 });
 
-test("mobile viewport has no horizontal body overflow", async ({ page }) => {
+test("viewport has no horizontal body overflow", async ({ page }) => {
   await loadDashboard(page);
 
   await expectNoHorizontalBodyOverflow(page);
 });
 
-test("accessibility contract covers scope copy, labels, heatmap, and timer keyboard controls", async ({
+test("accessibility contract covers labels, heatmap, and timer keyboard controls", async ({
   page
 }) => {
   await loadDashboard(page);
 
   await expect(page.getByText("Local mode · cloud-ready schema")).toBeVisible();
-  await expect(page.getByText(/cloud sync|syncing|synced|online sync|server sync/i)).toHaveCount(0);
+  await expect(page.getByText(/online sync|server sync|syncing|synced/i)).toHaveCount(0);
 
   const unlabeledControls = await page.evaluate(() => {
     const unlabeledButtons = [...document.querySelectorAll("button")].filter(
@@ -146,12 +182,15 @@ test("accessibility contract covers scope copy, labels, heatmap, and timer keybo
   });
 
   expect(unlabeledControls).toBe(0);
+
+  await openView(page, "Progress");
   await expect(
     page.getByTestId("history-heatmap").getByRole("button", {
       name: "2026-07-22, 0% complete"
     })
   ).toBeVisible();
 
+  await openView(page, "Timer");
   const timerPanel = page.getByTestId("study-timer-panel");
   const startButton = timerPanel.getByRole("button", { name: /start/i });
   await startButton.focus();
@@ -174,5 +213,6 @@ test("accessibility contract covers scope copy, labels, heatmap, and timer keybo
   await expect(finishButton).toBeFocused();
   await page.keyboard.press("Enter");
 
+  await openView(page, "Check-in");
   await expect(page.getByTestId("checkin-study-time-status")).toContainText("Reading 1/60 min");
 });

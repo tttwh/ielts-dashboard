@@ -115,7 +115,7 @@ export function NumberField({
       >
         {label}
       </label>
-      <div className="mt-1 flex min-w-0 items-center rounded-[6px] border border-line bg-white shadow-sm focus-within:border-ielts-blue focus-within:ring-2 focus-within:ring-blue-100">
+      <div className="mt-1 flex min-w-0 items-center rounded-[6px] border border-white/75 bg-white/70 shadow-[0_1px_0_rgba(255,255,255,0.78)_inset] backdrop-blur focus-within:border-ielts-blue focus-within:ring-2 focus-within:ring-blue-100">
         <input
           className="h-9 min-w-0 flex-1 rounded-[6px] border-0 bg-transparent px-2 font-mono text-sm font-semibold text-ink outline-none"
           id={id}
@@ -130,7 +130,7 @@ export function NumberField({
           value={draftValue}
         />
         {suffix ? (
-          <span aria-hidden="true" className="shrink-0 border-l border-line px-2 text-xs font-medium text-muted">
+          <span aria-hidden="true" className="shrink-0 border-l border-blue-100/80 px-2 text-xs font-medium text-muted">
             {suffix}
           </span>
         ) : null}

@@ -45,7 +45,7 @@ export function SummaryHeader({ state, summary, streakDays, xp, level }: Summary
 
   return (
     <section
-      className="overflow-hidden rounded-[8px] border border-line bg-white shadow-sm"
+      className="glass-panel overflow-hidden"
       data-testid="summary-header"
     >
       <div className="flex min-w-0 flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between">

@@ -7,6 +7,7 @@ import { readState } from "./services/storage/localStorageAdapter";
 describe("App", () => {
   beforeEach(() => {
     localStorage.clear();
+    window.history.replaceState(null, "", "/");
   });
 
   afterEach(() => {
@@ -20,31 +21,35 @@ describe("App", () => {
     fireEvent.blur(input);
   };
 
-  it("composes the shell with live default dashboard summary values", () => {
+  const openView = (label: string) => {
+    fireEvent.click(screen.getByRole("link", { name: label }));
+  };
+
+  it("composes the shell with navigation, summary values, and the overview page", () => {
     render(<App />);
 
     expect(screen.getByRole("heading", { name: "IELTS Prep Dashboard" })).toBeVisible();
     expect(screen.getByText(/Local mode . cloud-ready schema/)).toBeVisible();
+    expect(screen.getByTestId("dashboard-navigation")).toBeVisible();
+    expect(screen.getByRole("link", { name: "Overview" })).toHaveAttribute(
+      "aria-current",
+      "page"
+    );
     expect(screen.getByText("Target band")).toBeVisible();
     expect(screen.getByText("7")).toHaveClass("font-mono");
     expect(within(screen.getByTestId("summary-header")).getByText("0%")).toHaveClass("font-mono");
-    expect(screen.getByText("0 days")).toHaveClass("font-mono");
-    expect(screen.getByText("0 XP")).toHaveClass("font-mono");
+    expect(within(screen.getByTestId("summary-header")).getByText("0 days")).toHaveClass(
+      "font-mono"
+    );
+    expect(within(screen.getByTestId("summary-header")).getByText("0 XP")).toHaveClass(
+      "font-mono"
+    );
     expect(within(screen.getByTestId("summary-header")).getByText("Level 1")).toHaveClass(
       "font-mono"
     );
-    expect(screen.getByRole("heading", { name: "History Summary" })).toBeVisible();
-    const heatmapCells = within(screen.getByTestId("history-heatmap")).getAllByRole("button");
-    expect(heatmapCells).toHaveLength(60);
-    expect(heatmapCells.every((cell) => cell.getAttribute("data-level") === "0")).toBe(true);
-    const lockedBadges = within(screen.getByTestId("locked-achievements")).getAllByTestId(
-      /^achievement-/
-    );
-    expect(lockedBadges).toHaveLength(10);
-    lockedBadges.forEach((badge) => {
-      expect(badge).toHaveAttribute("aria-disabled", "true");
-    });
-    expect(within(screen.getByTestId("unlocked-achievements")).getByText("No unlocks yet")).toBeVisible();
+    expect(screen.getByTestId("page-overview")).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Overview" })).toBeVisible();
+    expect(screen.queryByTestId("daily-checkin")).not.toBeInTheDocument();
     expect(screen.getByRole("main")).toBeVisible();
   });
 
@@ -57,9 +62,8 @@ describe("App", () => {
     await user.click(screen.getByRole("button", { name: "中" }));
 
     expect(screen.getByRole("heading", { name: "雅思备考打卡看板" })).toBeVisible();
-    expect(screen.getByRole("region", { name: "每日打卡" })).toBeVisible();
-    expect(screen.getByRole("region", { name: "学习计时器" })).toBeVisible();
-    expect(screen.getByRole("region", { name: "目标看板" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "总览" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "打卡" })).toBeVisible();
     expect(document.documentElement).toHaveAttribute("lang", "zh-CN");
 
     unmount();
@@ -76,23 +80,28 @@ describe("App", () => {
   it("updates today's check-in values until All Clear appears", () => {
     render(<App />);
 
+    openView("Settings");
+    for (const label of [
+      "Listening minutes",
+      "Speaking minutes",
+      "Reading minutes",
+      "Writing minutes"
+    ]) {
+      setNumberField(label, "0");
+    }
+
+    openView("Check-in");
     setNumberField("Words actual", "100");
     setNumberField("Speaking topics actual", "3");
     setNumberField("Listening tests actual", "1");
     setNumberField("Corpus minutes actual", "30");
 
-    expect(screen.getByText("Study time targets pending")).toBeVisible();
-    expect(
-      within(screen.getByTestId("daily-checkin")).queryByText("All Clear")
-    ).not.toBeInTheDocument();
-
-    for (const label of ["Listening minutes", "Speaking minutes", "Reading minutes", "Writing minutes"]) {
-      setNumberField(label, "0");
-    }
-
     expect(screen.queryByText("Study time targets pending")).not.toBeInTheDocument();
     expect(within(screen.getByTestId("daily-checkin")).getByText("All Clear")).toBeVisible();
     expect(screen.getByText("120 XP")).toHaveClass("font-mono");
+
+    openView("Rewards");
+
     expect(
       within(screen.getByTestId("rewards-panel")).getByTestId("achievement-all-clear")
     ).not.toHaveAttribute("aria-disabled");
@@ -104,14 +113,17 @@ describe("App", () => {
 
     render(<App />);
 
+    openView("Check-in");
     expect(screen.getByText("Listening 0/45 min")).toBeVisible();
 
+    openView("Timer");
     const manualForm = screen.getByTestId("manual-external-time-form");
     await user.selectOptions(within(manualForm).getByLabelText("Manual section"), "listening");
     await user.clear(within(manualForm).getByLabelText("Manual minutes"));
     await user.type(within(manualForm).getByLabelText("Manual minutes"), "45");
     await user.click(within(manualForm).getByRole("button", { name: /record external time/i }));
 
+    openView("Check-in");
     expect(screen.queryByText("Listening 0/45 min")).not.toBeInTheDocument();
     expect(screen.getByText("Speaking 0/30 min")).toBeVisible();
   });
@@ -120,10 +132,14 @@ describe("App", () => {
     const user = userEvent.setup();
     const { unmount } = render(<App />);
 
+    openView("Settings");
     setNumberField("Total band", "7.0");
     setNumberField("Words", "120");
+
+    openView("Check-in");
     setNumberField("Words actual", "120");
 
+    openView("Timer");
     const manualForm = screen.getByTestId("manual-external-time-form");
     await user.selectOptions(within(manualForm).getByLabelText("Manual section"), "reading");
     await user.clear(within(manualForm).getByLabelText("Manual minutes"));
@@ -133,10 +149,15 @@ describe("App", () => {
     unmount();
     render(<App />);
 
+    openView("Settings");
     expect(screen.getByLabelText("Total band")).toHaveDisplayValue("7.0");
     expect(screen.getByLabelText("Words")).toHaveDisplayValue("120");
+
+    openView("Check-in");
     expect(screen.getByLabelText("Words actual")).toHaveDisplayValue("120");
     expect(screen.getByText("Reading 30/60 min")).toBeVisible();
+
+    openView("Progress");
     expect(
       within(screen.getByTestId("history-heatmap")).getByRole("button", {
         name: /19% complete/
@@ -147,7 +168,9 @@ describe("App", () => {
   it("updates today's heatmap cell after check-in progress", () => {
     render(<App />);
 
+    openView("Check-in");
     setNumberField("Words actual", "100");
+    openView("Progress");
 
     const heatmap = screen.getByTestId("history-heatmap");
 
@@ -166,6 +189,7 @@ describe("App", () => {
       vi.advanceTimersByTime(11_000);
     });
 
+    openView("Timer");
     const manualForm = screen.getByTestId("manual-external-time-form");
     fireEvent.change(within(manualForm).getByLabelText("Manual section"), {
       target: { value: "listening" }
@@ -174,6 +198,8 @@ describe("App", () => {
       target: { value: "15" }
     });
     fireEvent.click(within(manualForm).getByRole("button", { name: /record external time/i }));
+
+    openView("Check-in");
     setNumberField("Words actual", "100");
 
     const persistedState = readState();

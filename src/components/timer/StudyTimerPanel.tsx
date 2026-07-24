@@ -128,15 +128,15 @@ export function StudyTimerPanel({
   return (
     <section
       aria-label={t.timer.regionLabel}
-      className="min-w-0 rounded-[8px] border border-line bg-white shadow-sm"
+      className="glass-panel min-w-0"
       data-testid="study-timer-panel"
     >
-      <div className="flex min-w-0 flex-col gap-3 border-b border-line p-4 lg:flex-row lg:items-start lg:justify-between">
+      <div className="flex min-w-0 flex-col gap-3 border-b border-white/70 p-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <h2 className="text-base font-semibold leading-6 text-ink">{t.timer.title}</h2>
           <p className="mt-1 text-sm leading-5 text-muted">{t.timer.description}</p>
         </div>
-        <div className="inline-flex min-h-9 items-center rounded-[6px] border border-line bg-surface px-3 font-mono text-xs font-semibold uppercase tracking-normal text-ink">
+        <div className="inline-flex min-h-9 items-center rounded-[6px] border border-white/75 bg-white/60 px-3 font-mono text-xs font-semibold uppercase tracking-normal text-ink shadow-[0_1px_0_rgba(255,255,255,0.8)_inset]">
           {statusLabel}
         </div>
       </div>
@@ -156,8 +156,8 @@ export function StudyTimerPanel({
                   aria-pressed={isSelected}
                   className={`min-h-11 min-w-0 rounded-[6px] border px-2 text-sm font-semibold transition-colors ${
                     isSelected
-                      ? "border-ielts-blue bg-ielts-blue text-white"
-                      : "border-line bg-white text-ink hover:bg-surface"
+                      ? "border-ielts-blue bg-ielts-blue text-white shadow-[0_10px_26px_-18px_rgba(40,85,217,0.8)]"
+                      : "border-white/75 bg-white/58 text-ink hover:border-blue-200 hover:bg-white/84"
                   } disabled:cursor-not-allowed disabled:opacity-60`}
                   disabled={sectionSwitchLocked}
                   key={section}
@@ -226,13 +226,13 @@ export function StudyTimerPanel({
         </div>
 
         <form
-          className="min-w-0 border-t border-line pt-4 xl:border-l xl:border-t-0 xl:pl-4 xl:pt-0"
+          className="min-w-0 border-t border-white/70 pt-4 xl:border-l xl:border-t-0 xl:pl-4 xl:pt-0"
           data-testid="manual-external-time-form"
           onSubmit={handleManualSubmit}
         >
           <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
             <h3 className="text-sm font-semibold text-ink">{t.timer.manualEntry}</h3>
-            <span className="rounded-[6px] border border-line bg-surface px-2 py-1 text-xs font-semibold text-muted">
+            <span className="rounded-[6px] border border-white/75 bg-white/58 px-2 py-1 text-xs font-semibold text-muted">
               {t.timer.manualExternalTime}
             </span>
           </div>
@@ -243,7 +243,7 @@ export function StudyTimerPanel({
                 {t.timer.manualSection}
               </span>
               <select
-                className="mt-1 h-10 w-full min-w-0 rounded-[6px] border border-line bg-white px-2 text-sm font-semibold text-ink outline-none focus:border-ielts-blue focus:ring-2 focus:ring-blue-100"
+                className="mt-1 h-10 w-full min-w-0 rounded-[6px] border border-white/75 bg-white/70 px-2 text-sm font-semibold text-ink outline-none shadow-[0_1px_0_rgba(255,255,255,0.78)_inset] backdrop-blur focus:border-ielts-blue focus:ring-2 focus:ring-blue-100"
                 onChange={(event) => setManualSection(event.currentTarget.value as IeltsSection)}
                 value={manualSection}
               >
@@ -260,7 +260,7 @@ export function StudyTimerPanel({
                 {t.timer.manualMinutes}
               </span>
               <input
-                className="mt-1 h-10 w-full min-w-0 rounded-[6px] border border-line bg-white px-2 font-mono text-sm font-semibold text-ink outline-none focus:border-ielts-blue focus:ring-2 focus:ring-blue-100"
+                className="mt-1 h-10 w-full min-w-0 rounded-[6px] border border-white/75 bg-white/70 px-2 font-mono text-sm font-semibold text-ink outline-none shadow-[0_1px_0_rgba(255,255,255,0.78)_inset] backdrop-blur focus:border-ielts-blue focus:ring-2 focus:ring-blue-100"
                 inputMode="numeric"
                 max={1440}
                 min={1}

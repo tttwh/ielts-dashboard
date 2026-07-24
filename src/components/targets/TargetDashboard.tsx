@@ -22,10 +22,10 @@ export function TargetDashboard({
   return (
     <section
       aria-label={t.targets.regionLabel}
-      className="min-w-0 rounded-[8px] border border-line bg-white shadow-sm"
+      className="glass-panel min-w-0"
       data-testid="target-dashboard"
     >
-      <div className="flex min-w-0 flex-col gap-2 border-b border-line p-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex min-w-0 flex-col gap-2 border-b border-white/70 p-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
           <h2 className="text-base font-semibold leading-6 text-ink">{t.targets.title}</h2>
           <p className="mt-1 text-sm leading-5 text-muted">{t.targets.description}</p>

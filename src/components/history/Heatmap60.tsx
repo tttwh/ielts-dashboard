@@ -59,10 +59,10 @@ export function Heatmap60({ records, today }: Heatmap60Props) {
   return (
     <section
       aria-labelledby="history-summary-heading"
-      className="min-w-0 overflow-hidden rounded-[8px] border border-line bg-white shadow-sm"
+      className="glass-panel min-w-0 overflow-hidden"
       data-testid="history-heatmap"
     >
-      <div className="flex min-w-0 flex-col gap-3 border-b border-line p-4 md:flex-row md:items-end md:justify-between">
+      <div className="flex min-w-0 flex-col gap-3 border-b border-white/70 p-4 md:flex-row md:items-end md:justify-between">
         <div className="min-w-0">
           <h2 id="history-summary-heading" className="text-base font-semibold leading-6 text-ink">
             {t.history.title}

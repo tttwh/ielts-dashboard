@@ -108,10 +108,10 @@ export function DailyCheckIn({
   return (
     <section
       aria-label={t.checkIn.regionLabel}
-      className="min-w-0 rounded-[8px] border border-line bg-white shadow-sm"
+      className="glass-panel min-w-0"
       data-testid="daily-checkin"
     >
-      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 border-b border-line p-4">
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 border-b border-white/70 p-4">
         <h2 className="text-base font-semibold leading-6 text-ink">{t.checkIn.title}</h2>
         {todayRecord.isAllClear ? (
           <span className="checkin-all-clear-badge" aria-live="polite">
@@ -120,7 +120,7 @@ export function DailyCheckIn({
         ) : null}
       </div>
 
-      <div className="divide-y divide-line">
+      <div className="divide-y divide-white/70">
         {tasks.map((task) => {
           const progress = rowProgress(task.actual, task.target);
           const isComplete = progress !== null && progress >= 1;

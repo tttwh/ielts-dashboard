@@ -1,26 +1,26 @@
 import type { ReactNode } from "react";
-import { useI18n } from "../../i18n/I18nProvider";
+import type { DashboardView } from "../../domain/navigation";
+import { AppNavigation } from "./AppNavigation";
 
 interface AppShellProps {
+  activeView: DashboardView;
   children: ReactNode;
+  onViewChange(view: DashboardView): void;
   summary: ReactNode;
-  sidebar?: ReactNode;
 }
 
-export function AppShell({ children, summary, sidebar }: AppShellProps) {
-  const { t } = useI18n();
-
+export function AppShell({ activeView, children, onViewChange, summary }: AppShellProps) {
   return (
-    <div className="min-h-screen overflow-x-hidden bg-surface text-ink">
-      <div className="mx-auto flex w-full max-w-[1280px] flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8 lg:py-6">
-        <header>{summary}</header>
-        <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px]">
-          <main className="min-w-0">{children}</main>
-          {sidebar ? (
-            <aside aria-label={t.shell.sidebarLabel} className="min-w-0">
-              {sidebar}
-            </aside>
-          ) : null}
+    <div className="liquid-app min-h-dvh overflow-x-hidden text-ink">
+      <div className="mx-auto grid w-full max-w-[1440px] gap-4 px-3 py-3 sm:px-5 lg:grid-cols-[240px_minmax(0,1fr)] lg:px-6 lg:py-5">
+        <aside className="min-w-0 lg:sticky lg:top-5 lg:self-start">
+          <AppNavigation activeView={activeView} onViewChange={onViewChange} />
+        </aside>
+        <div className="grid min-w-0 gap-4">
+          <header>{summary}</header>
+          <main className="min-w-0" data-testid={`page-${activeView}`}>
+            {children}
+          </main>
         </div>
       </div>
     </div>

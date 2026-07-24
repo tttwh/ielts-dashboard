@@ -1,4 +1,5 @@
 import { render } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createDefaultAppState } from "./domain/defaults";
 import { createEmptyDailyRecord } from "./domain/progress";
@@ -12,14 +13,15 @@ const mocks = vi.hoisted(() => {
 
   return {
     appShellProps: vi.fn(),
+    checkInPageProps: vi.fn(),
     createLocalStorageRepository: vi.fn(() => fakeRepository),
-    dailyCheckInProps: vi.fn(),
     fakeRepository,
-    heatmapProps: vi.fn(),
-    rewardsProps: vi.fn(),
-    studyTimerProps: vi.fn(),
+    overviewPageProps: vi.fn(),
+    progressPageProps: vi.fn(),
+    rewardsPageProps: vi.fn(),
+    settingsPageProps: vi.fn(),
+    studyTimerPageProps: vi.fn(),
     summaryHeaderProps: vi.fn(),
-    targetDashboardProps: vi.fn(),
     useCurrentDateKey: vi.fn(() => "2026-07-22"),
     useDashboardData: vi.fn()
   };
@@ -39,21 +41,22 @@ vi.mock("./hooks/useCurrentDateKey", () => ({
 
 vi.mock("./components/layout/AppShell", () => ({
   AppShell: ({
+    activeView,
     children,
-    sidebar,
+    onViewChange,
     summary
   }: {
-    children: React.ReactNode;
-    sidebar?: React.ReactNode;
-    summary: React.ReactNode;
+    activeView: string;
+    children: ReactNode;
+    onViewChange(view: string): void;
+    summary: ReactNode;
   }) => {
-    mocks.appShellProps({ children, sidebar, summary });
+    mocks.appShellProps({ activeView, children, onViewChange, summary });
 
     return (
       <div data-testid="mock-app-shell">
         <div data-testid="mock-summary-slot">{summary}</div>
         <main>{children}</main>
-        <aside>{sidebar}</aside>
       </div>
     );
   }
@@ -67,77 +70,97 @@ vi.mock("./components/summary/SummaryHeader", () => ({
   }
 }));
 
-vi.mock("./components/targets/TargetDashboard", () => ({
-  TargetDashboard: (props: Record<string, unknown>) => {
-    mocks.targetDashboardProps(props);
+vi.mock("./pages/OverviewPage", () => ({
+  OverviewPage: (props: Record<string, unknown>) => {
+    mocks.overviewPageProps(props);
 
-    return <div data-testid="mock-target-dashboard" />;
+    return <div data-testid="mock-overview-page" />;
   }
 }));
 
-vi.mock("./components/checkin/DailyCheckIn", () => ({
-  DailyCheckIn: (props: Record<string, unknown>) => {
-    mocks.dailyCheckInProps(props);
+vi.mock("./pages/CheckInPage", () => ({
+  CheckInPage: (props: Record<string, unknown>) => {
+    mocks.checkInPageProps(props);
 
-    return <div data-testid="mock-daily-check-in" />;
+    return <div data-testid="mock-check-in-page" />;
   }
 }));
 
-vi.mock("./components/timer/StudyTimerPanel", () => ({
-  StudyTimerPanel: (props: Record<string, unknown>) => {
-    mocks.studyTimerProps(props);
+vi.mock("./pages/TimerPage", () => ({
+  TimerPage: (props: Record<string, unknown>) => {
+    mocks.studyTimerPageProps(props);
 
-    return <div data-testid="mock-study-timer-panel" />;
+    return <div data-testid="mock-timer-page" />;
   }
 }));
 
-vi.mock("./components/history/Heatmap60", () => ({
-  Heatmap60: (props: Record<string, unknown>) => {
-    mocks.heatmapProps(props);
+vi.mock("./pages/ProgressPage", () => ({
+  ProgressPage: (props: Record<string, unknown>) => {
+    mocks.progressPageProps(props);
 
-    return <div data-testid="mock-heatmap-60" />;
+    return <div data-testid="mock-progress-page" />;
   }
 }));
 
-vi.mock("./components/rewards/RewardsPanel", () => ({
-  RewardsPanel: (props: Record<string, unknown>) => {
-    mocks.rewardsProps(props);
+vi.mock("./pages/RewardsPage", () => ({
+  RewardsPage: (props: Record<string, unknown>) => {
+    mocks.rewardsPageProps(props);
 
-    return <div data-testid="mock-rewards-panel" />;
+    return <div data-testid="mock-rewards-page" />;
+  }
+}));
+
+vi.mock("./pages/SettingsPage", () => ({
+  SettingsPage: (props: Record<string, unknown>) => {
+    mocks.settingsPageProps(props);
+
+    return <div data-testid="mock-settings-page" />;
   }
 }));
 
 import App from "./App";
 
+function arrangeDashboardData() {
+  const state = createDefaultAppState("2026-07-22T00:00:00.000Z");
+  const todayRecord = createEmptyDailyRecord(
+    "2026-07-22",
+    state.profile.userId,
+    "2026-07-22T00:00:00.000Z"
+  );
+  const updateProfile = vi.fn();
+  const updateDailyGoals = vi.fn();
+  const updateTodayRecord = vi.fn();
+  const addTimerSession = vi.fn();
+
+  state.records = [{ ...todayRecord, xpEarned: 135 }];
+  mocks.useDashboardData.mockReturnValue({
+    addTimerSession,
+    latestUnlockedAchievementId: "first-steps",
+    state,
+    todayRecord,
+    updateDailyGoals,
+    updateProfile,
+    updateTodayRecord
+  });
+
+  return {
+    addTimerSession,
+    state,
+    todayRecord,
+    updateDailyGoals,
+    updateProfile,
+    updateTodayRecord
+  };
+}
+
 describe("App composition", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.history.replaceState(null, "", "/");
   });
 
-  it("creates the local storage repository and wires dashboard data into every module", () => {
-    const state = createDefaultAppState("2026-07-22T00:00:00.000Z");
-    const todayRecord = createEmptyDailyRecord(
-      "2026-07-22",
-      state.profile.userId,
-      "2026-07-22T00:00:00.000Z"
-    );
-    const updateProfile = vi.fn();
-    const updateDailyGoals = vi.fn();
-    const updateTodayRecord = vi.fn();
-    const addTimerSession = vi.fn();
-    const unlockAchievementsIfNeeded = vi.fn();
-
-    state.records = [{ ...todayRecord, xpEarned: 135 }];
-    mocks.useDashboardData.mockReturnValue({
-      addTimerSession,
-      latestUnlockedAchievementId: "first-steps",
-      state,
-      todayRecord,
-      unlockAchievementsIfNeeded,
-      updateDailyGoals,
-      updateProfile,
-      updateTodayRecord
-    });
+  it("creates the local storage repository and wires summary plus default overview", () => {
+    const data = arrangeDashboardData();
 
     render(<App />);
 
@@ -148,44 +171,96 @@ describe("App composition", () => {
     );
     expect(mocks.appShellProps).toHaveBeenCalledWith(
       expect.objectContaining({
+        activeView: "overview",
         children: expect.anything(),
-        sidebar: expect.anything(),
+        onViewChange: expect.any(Function),
         summary: expect.anything()
       })
     );
     expect(mocks.summaryHeaderProps).toHaveBeenCalledWith(
       expect.objectContaining({
         level: 2,
-        state,
+        state: data.state,
         xp: 135
       })
     );
-    expect(mocks.targetDashboardProps).toHaveBeenCalledWith({
-      dailyGoals: state.dailyGoals,
-      profile: state.profile,
-      updateDailyGoals,
-      updateProfile
+    expect(mocks.overviewPageProps).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dailyGoals: data.state.dailyGoals,
+        level: 2,
+        onViewChange: expect.any(Function),
+        streakDays: 0,
+        todayRecord: data.todayRecord,
+        xp: 135
+      })
+    );
+    expect(mocks.checkInPageProps).not.toHaveBeenCalled();
+  });
+
+  it("wires the check-in page when the check-in route is active", () => {
+    const data = arrangeDashboardData();
+    window.history.replaceState(null, "", "#checkin");
+
+    render(<App />);
+
+    expect(mocks.checkInPageProps).toHaveBeenCalledWith({
+      dailyGoals: data.state.dailyGoals,
+      todayRecord: data.todayRecord,
+      updateTodayRecord: data.updateTodayRecord
     });
-    expect(mocks.dailyCheckInProps).toHaveBeenCalledWith({
-      dailyGoals: state.dailyGoals,
-      todayRecord,
-      updateTodayRecord
-    });
-    expect(mocks.studyTimerProps).toHaveBeenCalledWith({
-      addTimerSession,
-      dailyGoals: state.dailyGoals,
+  });
+
+  it("wires the timer page when the timer route is active", () => {
+    const data = arrangeDashboardData();
+    window.history.replaceState(null, "", "#timer");
+
+    render(<App />);
+
+    expect(mocks.studyTimerPageProps).toHaveBeenCalledWith({
+      addTimerSession: data.addTimerSession,
+      dailyGoals: data.state.dailyGoals,
       today: "2026-07-22",
-      userId: state.profile.userId
+      userId: data.state.profile.userId
     });
-    expect(mocks.heatmapProps).toHaveBeenCalledWith({
-      records: state.records,
+  });
+
+  it("wires the progress page when the progress route is active", () => {
+    const data = arrangeDashboardData();
+    window.history.replaceState(null, "", "#progress");
+
+    render(<App />);
+
+    expect(mocks.progressPageProps).toHaveBeenCalledWith({
+      records: data.state.records,
       today: "2026-07-22"
     });
-    expect(mocks.rewardsProps).toHaveBeenCalledWith({
-      achievements: state.achievements,
+  });
+
+  it("wires the rewards page when the rewards route is active", () => {
+    const data = arrangeDashboardData();
+    window.history.replaceState(null, "", "#rewards");
+
+    render(<App />);
+
+    expect(mocks.rewardsPageProps).toHaveBeenCalledWith({
+      achievements: data.state.achievements,
       latestUnlockedAchievementId: "first-steps",
       level: 2,
       xp: 135
+    });
+  });
+
+  it("wires the settings page when the settings route is active", () => {
+    const data = arrangeDashboardData();
+    window.history.replaceState(null, "", "#settings");
+
+    render(<App />);
+
+    expect(mocks.settingsPageProps).toHaveBeenCalledWith({
+      dailyGoals: data.state.dailyGoals,
+      profile: data.state.profile,
+      updateDailyGoals: data.updateDailyGoals,
+      updateProfile: data.updateProfile
     });
   });
 });
