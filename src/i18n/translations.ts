@@ -161,7 +161,8 @@ export interface I18nText {
     storageDescription: string;
     localStateKey: string;
     languageKey: string;
-    cloudReady: string;
+    cloudConfigured: string;
+    cloudLocalOnly: string;
     cloudMode: string;
     syncStatus: string;
   };
@@ -405,7 +406,8 @@ export const translations: Record<Language, I18nText> = {
       storageDescription: "This version stores study data in the current browser.",
       localStateKey: "Study data key: ielts-dashboard-state",
       languageKey: "Language key: ielts-dashboard-language",
-      cloudReady: "Cloud sync is planned, not active.",
+      cloudConfigured: "CloudBase configured. Local-first sync is enabled.",
+      cloudLocalOnly: "CloudBase is not configured. Local browser storage is active.",
       cloudMode: "CloudBase mode",
       syncStatus: "Sync status"
     },
@@ -585,7 +587,8 @@ export const translations: Record<Language, I18nText> = {
       storageDescription: "当前版本会把学习数据保存在当前浏览器。",
       localStateKey: "学习数据 key：ielts-dashboard-state",
       languageKey: "语言 key：ielts-dashboard-language",
-      cloudReady: "云同步已规划，当前尚未启用。",
+      cloudConfigured: "CloudBase 已配置，本地优先同步已启用。",
+      cloudLocalOnly: "CloudBase 未配置，当前使用本地浏览器存储。",
       cloudMode: "CloudBase 模式",
       syncStatus: "同步状态"
     },

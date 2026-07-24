@@ -136,7 +136,7 @@ const guestSyncState = (): SyncState => ({
 
 const offlineSyncState = (lastSyncedAt: string | null): SyncState => ({
   mode: "offline",
-  message: "Local changes are saved on this device.",
+  message: null,
   lastSyncedAt
 });
 

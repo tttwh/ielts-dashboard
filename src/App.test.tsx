@@ -4,15 +4,23 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import { readState } from "./services/storage/localStorageAdapter";
 
-vi.mock("./services/cloudbase/cloudbaseClient", () => ({
+const cloudbaseMocks = vi.hoisted(() => ({
   createCloudBaseClient: vi.fn(),
-  readCloudBaseConfig: vi.fn(() => {
-    throw new Error("VITE_CLOUDBASE_ENV_ID is required");
-  })
+  readCloudBaseConfig: vi.fn()
+}));
+
+vi.mock("./services/cloudbase/cloudbaseClient", () => ({
+  createCloudBaseClient: cloudbaseMocks.createCloudBaseClient,
+  readCloudBaseConfig: cloudbaseMocks.readCloudBaseConfig
 }));
 
 describe("App", () => {
   beforeEach(() => {
+    cloudbaseMocks.createCloudBaseClient.mockReset();
+    cloudbaseMocks.readCloudBaseConfig.mockReset();
+    cloudbaseMocks.readCloudBaseConfig.mockImplementation(() => {
+      throw new Error("VITE_CLOUDBASE_ENV_ID is required");
+    });
     localStorage.clear();
     window.history.replaceState(null, "", "/");
   });
@@ -30,6 +38,26 @@ describe("App", () => {
 
   const openView = (label: string) => {
     fireEvent.click(screen.getByRole("link", { name: label }));
+  };
+
+  const arrangeConfiguredCloudBase = () => {
+    cloudbaseMocks.readCloudBaseConfig.mockReturnValue({
+      accessKey: "publishable-test-key",
+      envId: "test-env",
+      region: "ap-shanghai"
+    });
+    cloudbaseMocks.createCloudBaseClient.mockReturnValue({
+      auth: {
+        getSession: vi.fn(async () => ({ data: { user: null }, error: null })),
+        onAuthStateChange: vi.fn(() => () => undefined),
+        signInWithPassword: vi.fn(),
+        signOut: vi.fn(),
+        signUp: vi.fn()
+      },
+      rdb: vi.fn(() => ({
+        from: vi.fn()
+      }))
+    });
   };
 
   it("composes the shell with navigation, summary values, and the overview page", () => {
@@ -71,6 +99,26 @@ describe("App", () => {
     expect(screen.getByText("Sync status")).toBeVisible();
     expect(screen.getAllByText("Local guest").length).toBeGreaterThan(0);
     expect(screen.getByText("Study data key: ielts-dashboard-state")).toBeVisible();
+  });
+
+  it("renders localized offline sync status in Chinese when CloudBase is configured", () => {
+    localStorage.setItem("ielts-dashboard-language", "zh");
+    arrangeConfiguredCloudBase();
+
+    render(<App />);
+
+    expect(screen.getByText("离线更改")).toBeVisible();
+    expect(screen.queryByText("Local changes are saved on this device.")).not.toBeInTheDocument();
+  });
+
+  it("shows active CloudBase status copy in settings when CloudBase is configured", () => {
+    arrangeConfiguredCloudBase();
+    render(<App />);
+
+    openView("Settings");
+
+    expect(screen.getByText("CloudBase configured. Local-first sync is enabled.")).toBeVisible();
+    expect(screen.queryByText("Cloud sync is planned, not active.")).not.toBeInTheDocument();
   });
 
   it("switches visible dashboard copy between Chinese and English and persists the choice", async () => {

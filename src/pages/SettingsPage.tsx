@@ -41,6 +41,9 @@ export function SettingsPage({
 }: SettingsPageProps) {
   const { t } = useI18n();
   const cloudbaseMode = cloudbaseConfigured ? t.sync.cloudbaseReady : t.sync.guest;
+  const cloudbaseStatusCopy = cloudbaseConfigured
+    ? t.settings.cloudConfigured
+    : t.settings.cloudLocalOnly;
   const currentSyncLabel = syncLabel(t, syncState);
 
   return (
@@ -82,7 +85,7 @@ export function SettingsPage({
           <span className="min-w-0 break-words font-mono">{t.settings.localStateKey}</span>
           <span className="min-w-0 break-words font-mono">{t.settings.languageKey}</span>
           <span className="min-w-0 break-words text-ielts-purple sm:col-span-2">
-            {t.settings.cloudReady}
+            {cloudbaseStatusCopy}
           </span>
           {syncState.message ? (
             <span className="min-w-0 break-words text-muted sm:col-span-2">
