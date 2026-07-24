@@ -23,3 +23,4 @@ Task 2: complete (commits 6ed8951..302b04a, review clean; minor: blank sign-in a
 Task 3: complete (commits 302b04a..49fc5cf, review clean; minor: SQL verifier does not prove every policy body or index)
 Task 4: complete (commits 49fc5cf..6437782, review clean)
 Task 5: complete (commits b824acc..69ee052, review clean)
+Task 6: complete (commits d463d28..a1f5fd2, review clean; minor fixed after approval)
