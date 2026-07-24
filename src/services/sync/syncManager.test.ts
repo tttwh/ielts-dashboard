@@ -7,11 +7,7 @@ import {
   createSyncManager,
   markAppStateSynced,
   mergeAppStates,
-  replaceAppStateUserId,
-  type SyncManager,
-  type SyncMode,
-  type SyncResult,
-  type SyncState
+  replaceAppStateUserId
 } from "./syncManager";
 
 const now = "2026-07-24T00:00:00.000Z";
@@ -23,22 +19,6 @@ const sectionMinutes = {
   speaking: 30,
   reading: 60,
   writing: 45
-};
-
-const _typeExports: {
-  manager: SyncManager | null;
-  mode: SyncMode;
-  result: SyncResult | null;
-  state: SyncState;
-} = {
-  manager: null,
-  mode: "guest",
-  result: null,
-  state: {
-    mode: "guest",
-    message: null,
-    lastSyncedAt: null
-  }
 };
 
 const createRecord = (overrides: Partial<DailyRecord> = {}): DailyRecord => ({
