@@ -125,14 +125,20 @@ export function createAuthService(authClient: CloudBaseAuthClient): AuthService 
     },
 
     async signIn(credentials) {
-      const email = credentials.account.trim();
+      const account = credentials.account.trim();
+      const isEmailAccount = account.includes("@");
 
-      assertValidEmail(email);
+      if (isEmailAccount) {
+        assertValidEmail(account);
+      } else {
+        const usernameError = validateUsername(account);
+        if (usernameError) throw new Error(usernameError);
+      }
       assertValidPassword(credentials.password);
 
       const data = assertCloudBaseOk(
         await authClient.signInWithPassword({
-          email,
+          [isEmailAccount ? "email" : "username"]: account,
           password: credentials.password
         })
       );

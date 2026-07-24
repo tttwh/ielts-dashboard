@@ -104,12 +104,33 @@ describe("createAuthService", () => {
     });
   });
 
-  it("surfaces invalid credentials before calling CloudBase", async () => {
+  it("signs in with username/password", async () => {
     const client = fakeAuthClient();
     const service = createAuthService(client);
 
-    await expect(service.signIn({ account: "bad-email", password: "bad" })).rejects.toThrow(
+    await service.signIn({ account: "bad-email", password: "abc12345" });
+    expect(client.signInWithPassword).toHaveBeenCalledWith({
+      username: "bad-email",
+      password: "abc12345"
+    });
+  });
+
+  it("rejects malformed email sign-in accounts before calling CloudBase", async () => {
+    const client = fakeAuthClient();
+    const service = createAuthService(client);
+
+    await expect(service.signIn({ account: "weihao@", password: "abc12345" })).rejects.toThrow(
       "Enter a valid email address."
+    );
+    expect(client.signInWithPassword).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid username sign-in accounts before calling CloudBase", async () => {
+    const client = fakeAuthClient();
+    const service = createAuthService(client);
+
+    await expect(service.signIn({ account: "123456", password: "abc12345" })).rejects.toThrow(
+      "Username cannot be all numbers."
     );
     expect(client.signInWithPassword).not.toHaveBeenCalled();
   });
