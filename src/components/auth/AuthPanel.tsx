@@ -1,4 +1,4 @@
-import { Mail, LogIn, LogOut, ShieldCheck, UserPlus } from "lucide-react";
+import { Mail, LogIn, LogOut, ShieldCheck } from "lucide-react";
 import {
   useEffect,
   useId,
