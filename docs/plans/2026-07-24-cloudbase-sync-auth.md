@@ -12,11 +12,11 @@
 
 - Backend must be Tencent Cloud CloudBase PG mode and must support RMB payment.
 - Registration is open in phase one, with `profiles.status` reserved for later whitelist or disabled-account control.
-- Use account/password auth in phase one; do not implement email SMTP verification, phone login, OAuth, or Aliyun.
+- Use CloudBase email verification registration and password login in phase one; do not implement custom SMTP, phone login, OAuth, or Aliyun.
 - Guest mode must keep working with LocalStorage.
 - Frontend must never commit Tencent SecretId, SecretKey, manager credentials, API Key, service token, or test account passwords.
 - CloudBase Web SDK config may include only environment id, region, and publishable access key.
-- All user-owned PG tables must enable RLS and enforce ownership with `user_id = auth.uid()` or the current CloudBase PG equivalent.
+- All user-owned PG tables must enable RLS and enforce ownership with `user_id = auth.uid()`. CloudBase PG user ids are strings: `auth.users.id` is `varchar(64)` and `auth.uid()` returns text.
 - UI must keep Chinese/English visible text coverage.
 - Desktop and mobile layouts must be checked.
 - Before final completion, run `npm.cmd run test`, `npm.cmd run build`, `npm.cmd run test:e2e`, strict TypeScript unused checks, browser desktop/mobile checks, CloudBase manual checks, and GitHub push verification.
@@ -31,7 +31,7 @@ Create:
 - `src/services/cloudbase/cloudbaseTypes.ts`: narrow app-owned TypeScript interfaces for CloudBase Auth and RDB clients, so tests can use fakes without depending on CloudBase internals.
 - `src/services/cloudbase/cloudbaseClient.ts`: reads Vite env, validates CloudBase config, initializes the SDK, and exposes `createCloudBaseClient()`.
 - `src/services/cloudbase/cloudbaseClient.test.ts`: config validation tests.
-- `src/services/cloudbase/authService.ts`: account/password validation and auth operations.
+- `src/services/cloudbase/authService.ts`: email verification registration, password login validation, and auth operations.
 - `src/services/cloudbase/authService.test.ts`: auth validation and mocked auth operation tests.
 - `cloudbase/sql/cloud-sync-auth.sql`: PostgreSQL schema and RLS policies.
 - `scripts/verify-cloudbase-sql.mjs`: static SQL safety checker.
@@ -83,7 +83,7 @@ Modify:
   - `CloudBaseConfig`
   - `readCloudBaseConfig(env?: ImportMetaEnv): CloudBaseConfig`
   - `createCloudBaseClient(config?: CloudBaseConfig): CloudBaseClient`
-  - `CloudBaseClient` with `auth(): CloudBaseAuthClient` and `rdb(): CloudBaseRdbClient`
+  - `CloudBaseClient` with `auth: CloudBaseAuthClient` and `rdb(): CloudBaseRdbClient`
 
 - [ ] **Step 1: Install the SDK with an exact lockfile entry**
 
@@ -129,19 +129,36 @@ export interface CloudBaseConfig {
 
 export interface CloudBaseAuthUser {
   uid: string;
+  email: string | null;
+  username: string | null;
   accountName: string | null;
 }
 
-export interface CloudBaseLoginState {
-  user: CloudBaseAuthUser | null;
+export interface CloudBaseAuthError {
+  message?: string;
+  code?: string;
+}
+
+export interface CloudBaseAuthResponseData {
+  user?: CloudBaseAuthUser | null;
+  session?: unknown;
+  messageId?: string;
+  verifyOtp?: (params: { token: string; messageId?: string }) => Promise<CloudBaseAuthResponse>;
+}
+
+export interface CloudBaseAuthResponse {
+  data: CloudBaseAuthResponseData | null;
+  error: CloudBaseAuthError | null;
 }
 
 export interface CloudBaseAuthClient {
-  signUp(input: { username: string; password: string }): Promise<CloudBaseLoginState>;
-  signInWithPassword(input: { username: string; password: string }): Promise<CloudBaseLoginState>;
-  signOut(): Promise<void>;
-  getLoginState(): Promise<CloudBaseLoginState | null>;
-  onLoginStateChanged(listener: (state: CloudBaseLoginState | null) => void): () => void;
+  signUp(input: { email: string; password: string; username?: string }): Promise<CloudBaseAuthResponse>;
+  signInWithPassword(input: { email?: string; username?: string; password: string }): Promise<CloudBaseAuthResponse>;
+  signOut(input?: { options?: { clearStorage?: boolean } }): Promise<CloudBaseAuthResponse | void>;
+  getSession(): Promise<CloudBaseAuthResponse>;
+  onAuthStateChange(
+    listener: (event: string, session: { user?: CloudBaseAuthUser | null } | null) => void
+  ): { data?: { subscription?: { unsubscribe(): void } } } | (() => void);
 }
 
 export interface CloudBaseRdbResult<T> {
@@ -160,7 +177,7 @@ export interface CloudBaseRdbClient {
 }
 
 export interface CloudBaseClient {
-  auth(): CloudBaseAuthClient;
+  auth: CloudBaseAuthClient;
   rdb(): CloudBaseRdbClient;
 }
 ```
@@ -248,7 +265,10 @@ export function createCloudBaseClient(config: CloudBaseConfig = readCloudBaseCon
   return cloudbase.init({
     env: config.envId,
     region: config.region,
-    accessKey: config.accessKey
+    accessKey: config.accessKey,
+    auth: {
+      detectSessionInUrl: true
+    }
   }) as unknown as CloudBaseClient;
 }
 ```
@@ -276,7 +296,7 @@ git commit -m "feat: add cloudbase client config"
 
 ---
 
-### Task 2: Account Auth Service
+### Task 2: Email Verification Auth Service
 
 **Files:**
 - Create: `src/services/cloudbase/authService.ts`
@@ -287,8 +307,11 @@ git commit -m "feat: add cloudbase client config"
   - `CloudBaseAuthClient`
   - `CloudBaseAuthUser`
 - Produces:
-  - `AccountCredentials`
-  - `validateAccountName(accountName: string): string | null`
+  - `EmailSignUpCredentials`
+  - `PasswordSignInCredentials`
+  - `EmailSignUpChallenge`
+  - `validateEmail(email: string): string | null`
+  - `validateUsername(username: string): string | null`
   - `validatePassword(password: string): string | null`
   - `createAuthService(authClient: CloudBaseAuthClient): AuthService`
 
@@ -301,30 +324,51 @@ import { describe, expect, it, vi } from "vitest";
 import type { CloudBaseAuthClient } from "./cloudbaseTypes";
 import {
   createAuthService,
-  validateAccountName,
+  validateEmail,
+  validateUsername,
   validatePassword
 } from "./authService";
 
+const user = {
+  uid: "u-1",
+  email: "weihao@example.com",
+  username: "weihao_01",
+  accountName: "weihao_01"
+};
+
 const fakeAuthClient = (): CloudBaseAuthClient => ({
-  signUp: vi.fn(async ({ username }) => ({ user: { uid: "u-1", accountName: username } })),
-  signInWithPassword: vi.fn(async ({ username }) => ({
-    user: { uid: "u-1", accountName: username }
+  signUp: vi.fn(async () => ({
+    data: {
+      messageId: "message-1",
+      verifyOtp: vi.fn(async () => ({ data: { user, session: {} }, error: null }))
+    },
+    error: null
   })),
-  signOut: vi.fn(async () => undefined),
-  getLoginState: vi.fn(async () => null),
-  onLoginStateChanged: vi.fn(() => () => undefined)
+  signInWithPassword: vi.fn(async () => ({
+    data: { user, session: {} },
+    error: null
+  })),
+  signOut: vi.fn(async () => ({ data: {}, error: null })),
+  getSession: vi.fn(async () => ({ data: { user: null }, error: null })),
+  onAuthStateChange: vi.fn(() => () => undefined)
 });
 
-describe("account validation", () => {
-  it("accepts CloudBase-compatible account names", () => {
-    expect(validateAccountName("weihao_01")).toBeNull();
-    expect(validateAccountName("ielts-user")).toBeNull();
+describe("auth validation", () => {
+  it("validates registration email", () => {
+    expect(validateEmail("weihao@example.com")).toBeNull();
+    expect(validateEmail("bad-email")).toBe("Enter a valid email address.");
   });
 
-  it("rejects unsafe account names", () => {
-    expect(validateAccountName("123456")).toBe("Account cannot be all numbers.");
-    expect(validateAccountName("-weihao")).toBe("Account cannot start or end with - or _.");
-    expect(validateAccountName("weihao@demo.com")).toBe("Use letters, numbers, - or _ only.");
+  it("accepts optional CloudBase-compatible usernames", () => {
+    expect(validateUsername("")).toBeNull();
+    expect(validateUsername("weihao_01")).toBeNull();
+    expect(validateUsername("ielts-user")).toBeNull();
+  });
+
+  it("rejects unsafe usernames", () => {
+    expect(validateUsername("123456")).toBe("Username cannot be all numbers.");
+    expect(validateUsername("-weihao")).toBe("Username must start with a letter or number.");
+    expect(validateUsername("ab")).toBe("Username must be 5-24 characters.");
   });
 
   it("requires password length and mixed character classes", () => {
@@ -335,26 +379,44 @@ describe("account validation", () => {
 });
 
 describe("createAuthService", () => {
-  it("signs up with username/password", async () => {
+  it("starts email verification registration", async () => {
     const client = fakeAuthClient();
     const service = createAuthService(client);
 
-    await expect(
-      service.signUp({ accountName: "weihao_01", password: "abc12345" })
-    ).resolves.toEqual({ uid: "u-1", accountName: "weihao_01" });
+    const challenge = await service.startEmailSignUp({
+      email: "weihao@example.com",
+      username: "weihao_01",
+      password: "abc12345"
+    });
+
+    expect(challenge.email).toBe("weihao@example.com");
+    expect(challenge.messageId).toBe("message-1");
     expect(client.signUp).toHaveBeenCalledWith({
+      email: "weihao@example.com",
       username: "weihao_01",
       password: "abc12345"
     });
   });
 
-  it("signs in with username/password", async () => {
+  it("completes email registration with verification code", async () => {
+    const client = fakeAuthClient();
+    const service = createAuthService(client);
+    const challenge = await service.startEmailSignUp({
+      email: "weihao@example.com",
+      username: "weihao_01",
+      password: "abc12345"
+    });
+
+    await expect(service.completeEmailSignUp(challenge, "123456")).resolves.toEqual(user);
+  });
+
+  it("signs in with email/password", async () => {
     const client = fakeAuthClient();
     const service = createAuthService(client);
 
-    await service.signIn({ accountName: "weihao_01", password: "abc12345" });
+    await service.signIn({ account: "weihao@example.com", password: "abc12345" });
     expect(client.signInWithPassword).toHaveBeenCalledWith({
-      username: "weihao_01",
+      email: "weihao@example.com",
       password: "abc12345"
     });
   });
@@ -363,8 +425,8 @@ describe("createAuthService", () => {
     const client = fakeAuthClient();
     const service = createAuthService(client);
 
-    await expect(service.signIn({ accountName: "12", password: "bad" })).rejects.toThrow(
-      "Account must be 3-32 characters."
+    await expect(service.signIn({ account: "bad-email", password: "bad" })).rejects.toThrow(
+      "Enter a valid email address."
     );
     expect(client.signInWithPassword).not.toHaveBeenCalled();
   });
@@ -386,25 +448,46 @@ Create `src/services/cloudbase/authService.ts`:
 ```ts
 import type { CloudBaseAuthClient, CloudBaseAuthUser } from "./cloudbaseTypes";
 
-export interface AccountCredentials {
-  accountName: string;
+export interface EmailSignUpCredentials {
+  email: string;
   password: string;
+  username?: string;
+}
+
+export interface PasswordSignInCredentials {
+  account: string;
+  password: string;
+}
+
+export interface EmailSignUpChallenge {
+  email: string;
+  messageId: string | null;
+  verifyOtp(params: { token: string; messageId?: string }): Promise<{
+    data: { user?: CloudBaseAuthUser | null } | null;
+    error: { message?: string; code?: string } | null;
+  }>;
 }
 
 export interface AuthService {
   getCurrentUser(): Promise<CloudBaseAuthUser | null>;
-  signUp(credentials: AccountCredentials): Promise<CloudBaseAuthUser>;
-  signIn(credentials: AccountCredentials): Promise<CloudBaseAuthUser>;
+  startEmailSignUp(credentials: EmailSignUpCredentials): Promise<EmailSignUpChallenge>;
+  completeEmailSignUp(challenge: EmailSignUpChallenge, verificationCode: string): Promise<CloudBaseAuthUser>;
+  signIn(credentials: PasswordSignInCredentials): Promise<CloudBaseAuthUser>;
   signOut(): Promise<void>;
   onAuthStateChanged(listener: (user: CloudBaseAuthUser | null) => void): () => void;
 }
 
-export function validateAccountName(accountName: string): string | null {
-  const value = accountName.trim();
-  if (value.length < 3 || value.length > 32) return "Account must be 3-32 characters.";
-  if (!/^[A-Za-z0-9_-]+$/.test(value)) return "Use letters, numbers, - or _ only.";
-  if (/^\d+$/.test(value)) return "Account cannot be all numbers.";
-  if (/^[-_]|[-_]$/.test(value)) return "Account cannot start or end with - or _.";
+export function validateEmail(email: string): string | null {
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return "Enter a valid email address.";
+  return null;
+}
+
+export function validateUsername(username: string): string | null {
+  const value = username.trim();
+  if (!value) return null;
+  if (value.length < 5 || value.length > 24) return "Username must be 5-24 characters.";
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(value)) return "Username must start with a letter or number.";
+  if (/^\d+$/.test(value)) return "Username cannot be all numbers.";
   return null;
 }
 
@@ -416,15 +499,15 @@ export function validatePassword(password: string): string | null {
   return null;
 }
 
-const assertValidCredentials = ({ accountName, password }: AccountCredentials) => {
-  const accountError = validateAccountName(accountName);
-  if (accountError) throw new Error(accountError);
-
+const assertValidPassword = (password: string) => {
   const passwordError = validatePassword(password);
   if (passwordError) throw new Error(passwordError);
 };
 
-const normalizedAccountName = (accountName: string) => accountName.trim();
+const assertCloudBaseOk = <T>(result: { data: T | null; error: { message?: string } | null }) => {
+  if (result.error) throw new Error(result.error.message ?? "CloudBase authentication failed.");
+  return result.data;
+};
 
 const requireUser = (user: CloudBaseAuthUser | null): CloudBaseAuthUser => {
   if (!user?.uid) throw new Error("CloudBase did not return an authenticated user.");
@@ -434,29 +517,61 @@ const requireUser = (user: CloudBaseAuthUser | null): CloudBaseAuthUser => {
 export function createAuthService(authClient: CloudBaseAuthClient): AuthService {
   return {
     async getCurrentUser() {
-      return (await authClient.getLoginState())?.user ?? null;
+      return assertCloudBaseOk(await authClient.getSession())?.user ?? null;
     },
-    async signUp(credentials) {
-      assertValidCredentials(credentials);
-      const state = await authClient.signUp({
-        username: normalizedAccountName(credentials.accountName),
+    async startEmailSignUp(credentials) {
+      const email = credentials.email.trim();
+      const username = credentials.username?.trim() || undefined;
+      const emailError = validateEmail(email);
+      if (emailError) throw new Error(emailError);
+      const usernameError = validateUsername(username ?? "");
+      if (usernameError) throw new Error(usernameError);
+      assertValidPassword(credentials.password);
+
+      const data = assertCloudBaseOk(await authClient.signUp({
+        email,
+        username,
         password: credentials.password
-      });
-      return requireUser(state.user);
+      }));
+      if (!data?.verifyOtp) throw new Error("CloudBase did not return a verification handler.");
+      return {
+        email,
+        messageId: data.messageId ?? null,
+        verifyOtp: data.verifyOtp
+      };
+    },
+    async completeEmailSignUp(challenge, verificationCode) {
+      const token = verificationCode.trim();
+      if (!/^\d{6}$/.test(token)) throw new Error("Verification code must be 6 digits.");
+      const data = assertCloudBaseOk(await challenge.verifyOtp({
+        token,
+        messageId: challenge.messageId ?? undefined
+      }));
+      return requireUser(data?.user ?? null);
     },
     async signIn(credentials) {
-      assertValidCredentials(credentials);
-      const state = await authClient.signInWithPassword({
-        username: normalizedAccountName(credentials.accountName),
+      const account = credentials.account.trim();
+      if (account.includes("@")) {
+        const emailError = validateEmail(account);
+        if (emailError) throw new Error(emailError);
+      } else {
+        const usernameError = validateUsername(account);
+        if (usernameError) throw new Error(usernameError);
+      }
+      assertValidPassword(credentials.password);
+      const data = assertCloudBaseOk(await authClient.signInWithPassword({
+        [account.includes("@") ? "email" : "username"]: account,
         password: credentials.password
-      });
-      return requireUser(state.user);
+      }));
+      return requireUser(data?.user ?? null);
     },
-    signOut() {
-      return authClient.signOut();
+    async signOut() {
+      await authClient.signOut();
     },
     onAuthStateChanged(listener) {
-      return authClient.onLoginStateChanged((state) => listener(state?.user ?? null));
+      const subscription = authClient.onAuthStateChange((_event, session) => listener(session?.user ?? null));
+      if (typeof subscription === "function") return subscription;
+      return () => subscription.data?.subscription?.unsubscribe();
     }
   };
 }
@@ -501,8 +616,9 @@ Create `cloudbase/sql/cloud-sync-auth.sql`:
 create extension if not exists pgcrypto;
 
 create table if not exists public.profiles (
-  user_id uuid primary key references auth.users(id) on delete cascade,
+  user_id varchar(64) primary key references auth.users(id),
   account_name text,
+  email text,
   status text not null default 'active' check (status in ('active', 'disabled', 'pending')),
   display_name text,
   created_at timestamptz not null default now(),
@@ -510,7 +626,7 @@ create table if not exists public.profiles (
 );
 
 create table if not exists public.user_settings (
-  user_id uuid primary key references auth.users(id) on delete cascade,
+  user_id varchar(64) primary key references auth.users(id),
   language text not null default 'zh-CN' check (language in ('zh-CN', 'en')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -518,7 +634,7 @@ create table if not exists public.user_settings (
 
 create table if not exists public.goals (
   goal_id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users(id) on delete cascade,
+  user_id varchar(64) not null references auth.users(id),
   overall_band numeric not null,
   listening_band numeric not null,
   speaking_band numeric not null,
@@ -536,7 +652,7 @@ create table if not exists public.goals (
 
 create table if not exists public.daily_records (
   record_id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users(id) on delete cascade,
+  user_id varchar(64) not null references auth.users(id),
   record_date date not null,
   words_memorized integer not null,
   speaking_topics integer not null,
@@ -554,7 +670,7 @@ create table if not exists public.daily_records (
 
 create table if not exists public.timer_sessions (
   session_id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users(id) on delete cascade,
+  user_id varchar(64) not null references auth.users(id),
   record_date date not null,
   section text not null check (section in ('listening', 'speaking', 'reading', 'writing')),
   source text not null check (source in ('in-app-timer', 'manual-external')),
@@ -570,7 +686,7 @@ create table if not exists public.timer_sessions (
 
 create table if not exists public.achievements (
   achievement_id text not null,
-  user_id uuid not null references auth.users(id) on delete cascade,
+  user_id varchar(64) not null references auth.users(id),
   name text not null,
   description text not null,
   category text not null check (category in ('streak', 'skill', 'milestone', 'balance')),
@@ -1165,7 +1281,7 @@ Create `src/hooks/useAuthSession.test.tsx` to verify:
 - initial state is `loading`
 - guest state after `getCurrentUser()` returns null
 - authenticated state after service returns a user
-- `signIn`, `signUp`, and `signOut` update state
+- `startEmailSignUp`, `completeEmailSignUp`, `signIn`, and `signOut` update state
 - service errors surface as `errorMessage`
 
 - [ ] **Step 2: Run failing hook tests**
@@ -1182,7 +1298,12 @@ Create `src/hooks/useAuthSession.ts`:
 
 ```ts
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { AccountCredentials, AuthService } from "../services/cloudbase/authService";
+import type {
+  EmailSignUpChallenge,
+  EmailSignUpCredentials,
+  PasswordSignInCredentials,
+  AuthService
+} from "../services/cloudbase/authService";
 import { createAuthService } from "../services/cloudbase/authService";
 import { createCloudBaseClient } from "../services/cloudbase/cloudbaseClient";
 import type { CloudBaseAuthUser } from "../services/cloudbase/cloudbaseTypes";
@@ -1191,8 +1312,10 @@ export interface AuthSession {
   status: "loading" | "guest" | "authenticated" | "error";
   user: CloudBaseAuthUser | null;
   errorMessage: string | null;
-  signUp(credentials: AccountCredentials): Promise<void>;
-  signIn(credentials: AccountCredentials): Promise<void>;
+  pendingSignUp: EmailSignUpChallenge | null;
+  startEmailSignUp(credentials: EmailSignUpCredentials): Promise<void>;
+  completeEmailSignUp(verificationCode: string): Promise<void>;
+  signIn(credentials: PasswordSignInCredentials): Promise<void>;
   signOut(): Promise<void>;
 }
 ```
@@ -1200,7 +1323,7 @@ export interface AuthSession {
 Default service:
 
 ```ts
-const defaultAuthService = () => createAuthService(createCloudBaseClient().auth());
+const defaultAuthService = () => createAuthService(createCloudBaseClient().auth);
 ```
 
 Use `useEffect` to call `getCurrentUser()` and register `onAuthStateChanged`.
@@ -1264,15 +1387,23 @@ Add to `I18nText`:
 auth: {
   title: string;
   account: string;
+  email: string;
+  username: string;
   password: string;
+  verificationCode: string;
   signIn: string;
   signUp: string;
+  sendVerificationCode: string;
+  completeSignUp: string;
   signOut: string;
   guest: string;
   signedInAs(accountName: string): string;
   validation: {
     accountHelp: string;
+    emailHelp: string;
+    usernameHelp: string;
     passwordHelp: string;
+    codeHelp: string;
   };
 };
 sync: {
@@ -1291,10 +1422,11 @@ Add complete English and Chinese strings. No visible text may be hard-coded in c
 
 Create tests that verify:
 
-- renders account and password inputs
-- rejects invalid account/password before calling submit
+- renders email, optional username, password, and verification-code inputs where relevant
+- rejects invalid email, username, password, or verification code before calling submit
 - calls `onSignIn` for sign in
-- calls `onSignUp` for sign up
+- calls `onStartEmailSignUp` to request a verification code
+- calls `onCompleteEmailSignUp` to complete sign up
 - shows signed-in account and logout button
 
 - [ ] **Step 3: Implement AuthPanel**
@@ -1305,9 +1437,11 @@ Create `src/components/auth/AuthPanel.tsx` with props:
 interface AuthPanelProps {
   status: "loading" | "guest" | "authenticated" | "error";
   accountName: string | null;
+  pendingSignUpEmail: string | null;
   errorMessage: string | null;
-  onSignIn(credentials: AccountCredentials): Promise<void>;
-  onSignUp(credentials: AccountCredentials): Promise<void>;
+  onSignIn(credentials: PasswordSignInCredentials): Promise<void>;
+  onStartEmailSignUp(credentials: EmailSignUpCredentials): Promise<void>;
+  onCompleteEmailSignUp(verificationCode: string): Promise<void>;
   onSignOut(): Promise<void>;
 }
 ```
@@ -1453,7 +1587,7 @@ Add script:
 Add Playwright coverage for:
 
 - auth panel opens on desktop and mobile
-- invalid account/password shows validation text
+- invalid email/username/password/verification-code values show validation text
 - guest mode still allows check-in, timer, settings, and language toggle
 - no horizontal overflow on 1440x900 and 390x844
 
@@ -1464,7 +1598,7 @@ Do not put real CloudBase credentials in Playwright tests.
 Document:
 
 - CloudBase PG is chosen because RMB payment is required.
-- CloudBase console setup: PG mode, username/password auth, publishable key, security origins, RLS SQL.
+- CloudBase console setup: PG mode, email verification registration, username/password login, publishable key, security origins, RLS SQL.
 - `.env.local` example using fake non-secret values only.
 - Local-first behavior.
 - Manual verification with two test accounts.

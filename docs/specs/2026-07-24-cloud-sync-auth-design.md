@@ -12,7 +12,7 @@ Aliyun is not needed for this phase. Revisit Aliyun only when the project needs 
 
 ## Goals
 
-- Add account/password registration, login, logout, and session restore.
+- Add email verification registration, password login, logout, and session restore.
 - Preserve guest mode with the existing LocalStorage data.
 - Import existing local data into the authenticated user's cloud account after first login.
 - Sync targets, daily records, timer sessions, and achievements across devices.
@@ -50,7 +50,7 @@ Use CloudBase PG mode, not traditional document-database mode.
 Required CloudBase console setup:
 
 - Create a CloudBase environment in PG mode.
-- Enable username/password authentication according to CloudBase's current auth configuration.
+- Enable email verification registration and username/password login according to CloudBase's current auth configuration.
 - Generate a Publishable Key for Web SDK access.
 - Add local development and deployment origins to the CloudBase security source list.
 - Configure the environment region, expected first choice `ap-shanghai`.
@@ -66,12 +66,13 @@ No Tencent SecretId, SecretKey, admin token, service role key, or manager creden
 
 ## Auth Flow
 
-Use CloudBase Auth v2 through `@cloudbase/js-sdk`. The MVP uses username/password because CloudBase's current v2 guidance treats username/password as the canonical password login path. Email login is left for a later phase because CloudBase's email/password documentation points at the older v1 authentication flow and may require email sender configuration.
+Use CloudBase JS SDK v3 through `@cloudbase/js-sdk`. The MVP uses email verification registration because CloudBase's current v3 guidance does not support direct pure username plus password sign-up. During registration, the user enters email, password, optional username, and then a verification code sent by CloudBase. After registration, login uses `signInWithPassword` with email or username plus password.
 
 - Guest user opens the app and can use all local dashboard features.
 - User clicks account or sync control and opens an auth panel.
-- User registers with account name and password.
-- User logs in with account name and password.
+- User starts registration with email, password, and optional username.
+- User completes registration by entering the CloudBase email verification code.
+- User logs in with email or username plus password.
 - App restores CloudBase session on refresh through the CloudBase client.
 - User can log out; cloud data remains remote, local cache remains available.
 
@@ -87,12 +88,13 @@ The first phase sets every new profile to `active`. Later tightening can change 
 
 Use normalized PostgreSQL tables instead of one JSON blob because the app already has distinct domain entities and needs future analytics.
 
-All user-owned tables use `user_id uuid not null default auth.uid()` unless CloudBase PG requires a different UUID expression in current docs. The implementation must verify the exact CloudBase PG auth UID function before applying SQL.
+All user-owned tables use `user_id varchar(64) not null default auth.uid()`. CloudBase PG documents `auth.users.id` as `varchar(64)` and `auth.uid()` as text extracted from the JWT `sub` claim, so frontend and database code must treat CloudBase user ids as strings rather than UUIDs.
 
 ### profiles
 
-- `user_id uuid primary key references auth.users(id) on delete cascade`
+- `user_id varchar(64) primary key references auth.users(id)`
 - `account_name text`
+- `email text`
 - `status text not null default 'active'`
 - `display_name text`
 - `created_at timestamptz not null default now()`
@@ -100,7 +102,7 @@ All user-owned tables use `user_id uuid not null default auth.uid()` unless Clou
 
 ### user_settings
 
-- `user_id uuid primary key references auth.users(id) on delete cascade`
+- `user_id varchar(64) primary key references auth.users(id)`
 - `language text not null default 'zh-CN'`
 - `created_at timestamptz not null default now()`
 - `updated_at timestamptz not null default now()`
@@ -108,7 +110,7 @@ All user-owned tables use `user_id uuid not null default auth.uid()` unless Clou
 ### goals
 
 - `goal_id uuid primary key`
-- `user_id uuid not null references auth.users(id) on delete cascade`
+- `user_id varchar(64) not null references auth.users(id)`
 - `overall_band numeric not null`
 - `listening_band numeric not null`
 - `speaking_band numeric not null`
@@ -126,7 +128,7 @@ All user-owned tables use `user_id uuid not null default auth.uid()` unless Clou
 ### daily_records
 
 - `record_id uuid primary key`
-- `user_id uuid not null references auth.users(id) on delete cascade`
+- `user_id varchar(64) not null references auth.users(id)`
 - `record_date date not null`
 - `words_memorized integer not null`
 - `speaking_topics integer not null`
@@ -146,7 +148,7 @@ Add a unique index on `(user_id, record_date)` for active records.
 ### timer_sessions
 
 - `session_id uuid primary key`
-- `user_id uuid not null references auth.users(id) on delete cascade`
+- `user_id varchar(64) not null references auth.users(id)`
 - `record_date date not null`
 - `section text not null`
 - `source text not null`
@@ -162,7 +164,7 @@ Add a unique index on `(user_id, record_date)` for active records.
 ### achievements
 
 - `achievement_id text not null`
-- `user_id uuid not null references auth.users(id) on delete cascade`
+- `user_id varchar(64) not null references auth.users(id)`
 - `name text not null`
 - `description text not null`
 - `category text not null`
@@ -255,7 +257,7 @@ Add account and sync controls without turning the dashboard into a marketing pag
 
 - Add a compact account control in the app shell or settings page.
 - Show current mode: guest, signed in, syncing, synced, offline, or error.
-- Add auth panel with sign in, sign up, password validation, and error messages.
+- Add auth panel with sign in, email sign up, verification code, password validation, and error messages.
 - Add logout action.
 - Add local-to-cloud import messaging after first login.
 - Add settings copy that explains local-only mode versus CloudBase cloud sync.
@@ -315,7 +317,7 @@ Before commit:
 - Check browser console for errors.
 - Manually verify:
   - guest mode still works
-  - account/password sign up form validation works
+  - email sign-up form validation and verification-code step work with a configured CloudBase environment
   - login works with configured CloudBase PG environment
   - logout works
   - local data imports after first login
@@ -341,7 +343,7 @@ GitHub verification:
 
 ## Acceptance Criteria
 
-- A new user can register with account/password.
+- A new user can register with email verification and password.
 - An existing user can log in and out.
 - A guest can use the dashboard without an account.
 - Logged-in user data syncs to CloudBase PG and restores after refresh.
@@ -358,9 +360,8 @@ GitHub verification:
 ## References
 
 - CloudBase pricing: https://cloud.tencent.cn/document/product/876/75213
-- CloudBase Auth v2: https://docs.cloudbase.net/authentication-v2/auth/introduce
-- CloudBase email login: https://docs.cloudbase.net/authentication/method/email-login
-- CloudBase username login: https://docs.cloudbase.net/authentication/method/username-login
+- CloudBase JS SDK v3 authentication: https://docs.cloudbase.net/api-reference/webv3/authentication
+- CloudBase account password login: https://docs.cloudbase.net/authentication-v2/method/username-login
 - CloudBase PG auth: https://docs.cloudbase.net/authentication-v2/auth/auth-pg
 - CloudBase PG RLS permissions: https://docs.cloudbase.net/database/configuration/db/postgresql/data-permission
 - CloudBase PG quickstart: https://docs.cloudbase.net/database/configuration/db/postgresql/quickstart
