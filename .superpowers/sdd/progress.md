@@ -15,3 +15,10 @@ Task 10: complete (commits 63c6b90..dd5768c, review clean; minor: skill badge th
 Task 11: complete (commits a51dd38..e5a4348, review clean)
 Task 12: complete (commits 1d1e84d..d1f6745, review clean)
 Task 13: complete (commits bcdd059..b02ee5c, review clean; minor: keyboard reachability e2e could use real Tab order instead of programmatic focus)
+
+Plan: docs/plans/2026-07-24-cloudbase-sync-auth.md
+
+Task 1: complete (commits 7b8e6f4..6ed8951, review clean; note: Vitest mocks @cloudbase/js-sdk boundary because SDK Node export requires an undeclared Node-only package)
+Task 2: complete (commits 6ed8951..302b04a, review clean; minor: blank sign-in account can reach username login path)
+Task 3: complete (commits 302b04a..49fc5cf, review clean; minor: SQL verifier does not prove every policy body or index)
+Task 4: complete (commits 49fc5cf..6437782, review clean)

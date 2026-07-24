@@ -15,6 +15,7 @@ npm-debug.log*
 .superpowers/sdd/task-*-brief.md
 .superpowers/sdd/review-task-*.diff
 .superpowers/sdd/review-final-*.diff
+.superpowers/sdd/cloudbase/
 
 # OS junk
 .DS_Store
