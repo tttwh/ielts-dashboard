@@ -140,11 +140,14 @@ describe("CloudBase cloud mappers", () => {
       deleted_at: deletedAt
     });
     expect(rows.records).toEqual([
-      expect.objectContaining({
+      {
         record_id: "record-2026-07-24",
         user_id: "cloudbase-user-string",
         record_date: "2026-07-24",
         words_memorized: 210,
+        speaking_topics: 5,
+        listening_tests: 2,
+        corpus_minutes: 45,
         section_minutes: {
           listening: 50,
           speaking: 35,
@@ -155,11 +158,13 @@ describe("CloudBase cloud mappers", () => {
         completion_rate: 1,
         is_all_clear: true,
         xp_earned: 180,
+        created_at: now,
+        updated_at: updatedAt,
         deleted_at: deletedAt
-      })
+      }
     ]);
     expect(rows.timerSessions).toEqual([
-      expect.objectContaining({
+      {
         session_id: "session-2026-07-24-reading",
         user_id: "cloudbase-user-string",
         record_date: "2026-07-24",
@@ -167,15 +172,26 @@ describe("CloudBase cloud mappers", () => {
         source: "manual-external",
         planned_minutes: 60,
         actual_minutes: 70,
-        overtime_minutes: 10
-      })
+        overtime_minutes: 10,
+        started_at: "2026-07-24T08:00:00.000Z",
+        ended_at: "2026-07-24T09:10:00.000Z",
+        created_at: now,
+        updated_at: updatedAt,
+        deleted_at: null
+      }
     ]);
     expect(rows.achievements).toEqual([
-      expect.objectContaining({
+      {
         achievement_id: state.achievements[0].achievementId,
         user_id: "cloudbase-user-string",
-        unlocked_at: updatedAt
-      })
+        name: state.achievements[0].name,
+        description: state.achievements[0].description,
+        category: state.achievements[0].category,
+        unlocked_at: updatedAt,
+        created_at: now,
+        updated_at: updatedAt,
+        deleted_at: null
+      }
     ]);
   });
 
@@ -186,7 +202,7 @@ describe("CloudBase cloud mappers", () => {
     const restored = cloudRowsToAppState(rows, fallback);
 
     expect(restored.schemaVersion).toBe(1);
-    expect(restored.profile).toMatchObject({
+    expect(restored.profile).toEqual({
       userId: "cloudbase-user-string",
       targetBand: 7.5,
       sectionTargets: {
@@ -195,11 +211,11 @@ describe("CloudBase cloud mappers", () => {
         reading: 7.5,
         writing: 6.5
       },
-      syncStatus: "cloud-ready",
+      syncStatus: "synced",
       createdAt: now,
       updatedAt
     });
-    expect(restored.dailyGoals).toMatchObject({
+    expect(restored.dailyGoals).toEqual({
       userId: "cloudbase-user-string",
       wordsTarget: 180,
       speakingTopicsTarget: 4,
@@ -211,41 +227,80 @@ describe("CloudBase cloud mappers", () => {
         reading: 65,
         writing: 45
       },
+      createdAt: now,
+      updatedAt,
       deletedAt,
       syncStatus: "synced"
     });
     expect(restored.records).toEqual([
-      expect.objectContaining({
+      {
         recordId: "record-2026-07-24",
+        userId: "cloudbase-user-string",
         date: "2026-07-24",
         words: 210,
+        speakingTopics: 5,
+        listeningTests: 2,
+        corpusMinutes: 45,
         sectionMinutes: {
           listening: 50,
           speaking: 35,
           reading: 70,
           writing: 45
         },
+        readingOvertimeMinutes: 10,
+        completionRate: 1,
+        isAllClear: true,
+        xpEarned: 180,
+        createdAt: now,
+        updatedAt,
         deletedAt,
         syncStatus: "synced"
-      })
+      }
     ]);
     expect(restored.timerSessions).toEqual([
-      expect.objectContaining({
+      {
         sessionId: "session-2026-07-24-reading",
+        userId: "cloudbase-user-string",
         date: "2026-07-24",
         section: "reading",
         source: "manual-external",
+        plannedMinutes: 60,
+        actualMinutes: 70,
+        overtimeMinutes: 10,
+        startedAt: "2026-07-24T08:00:00.000Z",
+        endedAt: "2026-07-24T09:10:00.000Z",
+        createdAt: now,
+        updatedAt,
         deletedAt: null,
         syncStatus: "synced"
-      })
+      }
     ]);
     expect(restored.achievements).toEqual([
-      expect.objectContaining({
+      {
         achievementId: rows.achievements[0].achievement_id,
+        userId: "cloudbase-user-string",
+        name: rows.achievements[0].name,
+        description: rows.achievements[0].description,
+        category: rows.achievements[0].category,
         unlockedAt: updatedAt,
+        createdAt: now,
+        updatedAt,
         deletedAt: null,
         syncStatus: "synced"
-      })
+      }
     ]);
+  });
+
+  it("uses restored profile user id for fallback goals when goals row is absent", () => {
+    const fallback = createDefaultAppState(now);
+    const rows = appStateToCloudRows(createFilledState(), "weihao_01");
+
+    const restored = cloudRowsToAppState({ ...rows, goals: null }, fallback);
+
+    expect(restored.profile.userId).toBe("cloudbase-user-string");
+    expect(restored.dailyGoals).toEqual({
+      ...fallback.dailyGoals,
+      userId: "cloudbase-user-string"
+    });
   });
 });

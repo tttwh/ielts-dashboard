@@ -209,7 +209,7 @@ export function cloudRowsToAppState(rows: CloudRows, fallbackState: AppState): A
             writing: goals.writing_band
           }
         : cloneSectionTargets(fallbackState.profile.sectionTargets),
-      syncStatus: profile || goals ? "cloud-ready" : fallbackState.profile.syncStatus,
+      syncStatus: profile || goals ? "synced" : fallbackState.profile.syncStatus,
       createdAt: profile?.created_at ?? fallbackState.profile.createdAt,
       updatedAt: profile?.updated_at ?? fallbackState.profile.updatedAt
     },
@@ -225,8 +225,11 @@ export function cloudRowsToAppState(rows: CloudRows, fallbackState: AppState): A
           updatedAt: goals.updated_at,
           deletedAt: goals.deleted_at,
           syncStatus: "synced"
-        }
-      : fallbackState.dailyGoals,
+      }
+      : {
+          ...fallbackState.dailyGoals,
+          userId: profileUserId
+        },
     records: rows.records.map((record) => ({
       recordId: record.record_id,
       userId: record.user_id,

@@ -2,7 +2,7 @@ import type { AppState } from "./storageTypes";
 
 const STORAGE_KEY = "ielts-dashboard-state";
 const IELTS_SECTIONS = ["listening", "speaking", "reading", "writing"] as const;
-const PROFILE_SYNC_STATUSES = ["local", "cloud-ready"] as const;
+const PROFILE_SYNC_STATUSES = ["local", "cloud-ready", "synced"] as const;
 const SYNC_STATUSES = ["local-only", "synced", "pending", "conflict"] as const;
 const TIMER_SOURCES = ["in-app-timer", "manual-external"] as const;
 const ACHIEVEMENT_CATEGORIES = ["streak", "skill", "milestone", "balance"] as const;

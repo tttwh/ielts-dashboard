@@ -8,7 +8,7 @@ export interface UserProfile {
   userId: string;
   targetBand: number;
   sectionTargets: SectionTargets;
-  syncStatus: "local" | "cloud-ready";
+  syncStatus: "local" | "cloud-ready" | "synced";
   createdAt: string;
   updatedAt: string;
 }

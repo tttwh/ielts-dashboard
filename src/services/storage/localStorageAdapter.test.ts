@@ -207,6 +207,31 @@ describe("local storage repository", () => {
     });
   });
 
+  it("loads persisted profiles with synced cloud sync status", () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify(
+        createStoredState({
+          profile: {
+            ...validProfile,
+            userId: "cloudbase-user-string",
+            targetBand: 8,
+            syncStatus: "synced"
+          }
+        })
+      )
+    );
+
+    const state = createLocalStorageRepository().loadAppState();
+
+    expect(state.profile).toEqual({
+      ...validProfile,
+      userId: "cloudbase-user-string",
+      targetBand: 8,
+      syncStatus: "synced"
+    });
+  });
+
   it("round-trips goals, record xp, timer sessions, and achievement unlock state", () => {
     const repo = createLocalStorageRepository();
     const state = repo.loadAppState();
