@@ -12,6 +12,7 @@
     "test:e2e": "node ./scripts/test-e2e.mjs"
   },
   "dependencies": {
+    "@cloudbase/js-sdk": "3.6.4",
     "@vitejs/plugin-react": "latest",
     "lucide-react": "latest",
     "react": "latest",
@@ -19,8 +20,8 @@
     "vite": "latest"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "latest",
     "@playwright/test": "latest",
+    "@tailwindcss/vite": "latest",
     "@testing-library/jest-dom": "latest",
     "@testing-library/react": "latest",
     "@testing-library/user-event": "latest",
