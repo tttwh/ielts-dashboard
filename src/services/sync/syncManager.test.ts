@@ -249,6 +249,45 @@ describe("sync manager", () => {
     expect(savedStates[0]).toEqual(result.state);
   });
 
+  it("uses the newest same-date record when a deleted tombstone conflicts with an active record", () => {
+    const localState: AppState = {
+      ...replaceAppStateUserId(createDefaultAppState(now), "cloud-user-1"),
+      records: [
+        createRecord({
+          recordId: "local-deleted-record",
+          userId: "cloud-user-1",
+          date: "2026-07-24",
+          words: 0,
+          updatedAt: newer,
+          deletedAt: newer
+        })
+      ]
+    };
+    const cloudState: AppState = {
+      ...replaceAppStateUserId(createDefaultAppState(now), "cloud-user-1"),
+      records: [
+        createRecord({
+          recordId: "cloud-active-record",
+          userId: "cloud-user-1",
+          date: "2026-07-24",
+          words: 180,
+          updatedAt: older,
+          deletedAt: null
+        })
+      ]
+    };
+
+    const merged = mergeAppStates(localState, cloudState);
+
+    expect(merged.records).toHaveLength(1);
+    expect(merged.records[0]).toMatchObject({
+      recordId: "local-deleted-record",
+      date: "2026-07-24",
+      updatedAt: newer,
+      deletedAt: newer
+    });
+  });
+
   it("keeps unlocked achievements and preserves the earliest unlockedAt when both are unlocked", () => {
     const localState: AppState = {
       ...createDefaultAppState(now),
@@ -279,6 +318,123 @@ describe("sync manager", () => {
       unlockedAt: "2026-07-24T02:00:00.000Z"
     });
     expect(markAppStateSynced(merged).achievements[0].syncStatus).toBe("synced");
+  });
+
+  it("keeps unlocked achievements over locked achievements from either side", () => {
+    const localUnlocked = mergeAppStates(
+      {
+        ...replaceAppStateUserId(createDefaultAppState(now), "cloud-user-1"),
+        achievements: [
+          createAchievement({
+            userId: "cloud-user-1",
+            unlockedAt: older,
+            updatedAt: older
+          })
+        ]
+      },
+      {
+        ...replaceAppStateUserId(createDefaultAppState(now), "cloud-user-1"),
+        achievements: [
+          createAchievement({
+            userId: "cloud-user-1",
+            unlockedAt: null,
+            updatedAt: newer
+          })
+        ]
+      }
+    );
+    const cloudUnlocked = mergeAppStates(
+      {
+        ...replaceAppStateUserId(createDefaultAppState(now), "cloud-user-1"),
+        achievements: [
+          createAchievement({
+            userId: "cloud-user-1",
+            unlockedAt: null,
+            updatedAt: newer
+          })
+        ]
+      },
+      {
+        ...replaceAppStateUserId(createDefaultAppState(now), "cloud-user-1"),
+        achievements: [
+          createAchievement({
+            userId: "cloud-user-1",
+            unlockedAt: older,
+            updatedAt: older
+          })
+        ]
+      }
+    );
+
+    expect(localUnlocked.achievements).toHaveLength(1);
+    expect(localUnlocked.achievements[0].unlockedAt).toBe(older);
+    expect(cloudUnlocked.achievements).toHaveLength(1);
+    expect(cloudUnlocked.achievements[0].unlockedAt).toBe(older);
+  });
+
+  it("returns the original local state and does not save when import load fails", async () => {
+    const localState: AppState = {
+      ...createDefaultAppState(now),
+      records: [createRecord({ syncStatus: "pending" })]
+    };
+    const { repository } = createRepository({ loadError: new Error("load failed") });
+    const manager = createSyncManager(repository);
+
+    const result = await manager.importOrLoad("cloud-user-1", localState, "weihao_01");
+
+    expect(repository.loadCloudState).toHaveBeenCalledWith("cloud-user-1");
+    expect(repository.saveCloudState).not.toHaveBeenCalled();
+    expect(result.state).toEqual(localState);
+    expect(result.syncState).toEqual({
+      mode: "error",
+      message: "load failed",
+      lastSyncedAt: null
+    });
+  });
+
+  it("returns the original local state when import save fails", async () => {
+    const localState: AppState = {
+      ...createDefaultAppState(now),
+      records: [createRecord({ syncStatus: "pending" })]
+    };
+    const { repository } = createRepository({ saveError: new Error("save failed") });
+    const manager = createSyncManager(repository);
+
+    const result = await manager.importOrLoad("cloud-user-1", localState, "weihao_01");
+
+    expect(repository.saveCloudState).toHaveBeenCalledOnce();
+    expect(result.state).toEqual(localState);
+    expect(result.syncState).toEqual({
+      mode: "error",
+      message: "save failed",
+      lastSyncedAt: null
+    });
+  });
+
+  it("saves marked-synced state and returns synced when push succeeds", async () => {
+    const state: AppState = {
+      ...createDefaultAppState(now),
+      records: [createRecord({ syncStatus: "pending" })],
+      timerSessions: [createTimerSession({ syncStatus: "pending" })],
+      achievements: [createAchievement({ syncStatus: "pending" })]
+    };
+    const { repository, savedStates } = createRepository();
+    const manager = createSyncManager(repository);
+
+    const result = await manager.push(state, "weihao_01");
+
+    expect(repository.saveCloudState).toHaveBeenCalledWith(savedStates[0], "weihao_01");
+    expect(savedStates[0].profile.syncStatus).toBe("synced");
+    expect(savedStates[0].dailyGoals.syncStatus).toBe("synced");
+    expect(savedStates[0].records[0].syncStatus).toBe("synced");
+    expect(savedStates[0].timerSessions[0].syncStatus).toBe("synced");
+    expect(savedStates[0].achievements[0].syncStatus).toBe("synced");
+    expect(result.state).toEqual(savedStates[0]);
+    expect(result.syncState).toMatchObject({
+      mode: "synced",
+      message: null,
+      lastSyncedAt: expect.any(String)
+    });
   });
 
   it("returns an error state without losing local state when push fails", async () => {

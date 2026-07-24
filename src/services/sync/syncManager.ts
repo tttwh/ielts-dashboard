@@ -53,8 +53,7 @@ const mergeByKey = <T extends { updatedAt: string }>(
   return Array.from(merged.values());
 };
 
-const getRecordMergeKey = (record: DailyRecord) =>
-  record.deletedAt === null ? `active:${record.date}` : `deleted:${record.recordId}`;
+const getRecordMergeKey = (record: DailyRecord) => record.date;
 
 const chooseAchievement = (localAchievement: Achievement, cloudAchievement: Achievement) => {
   const localUnlocked = localAchievement.unlockedAt !== null;
