@@ -95,6 +95,15 @@ CloudBase 必须使用 PG mode，不使用传统文档数据库模式。控制�
 6. 区域默认使用 `ap-shanghai`，除非实际环境另有要求。
 7. 在 CloudBase PG SQL 控制台执行 `cloudbase/sql/cloud-sync-auth.sql`，创建表、索引和 RLS 策略。
 
+如果你之前在 CloudBase 里执行过旧版 SQL，先按 `docs/cloudbase-go-live-checklist.md` 里的顺序运行迁移文件：
+
+```text
+cloudbase/sql/migrations/2026-07-25-align-final-schema.sql
+cloudbase/sql/cloud-sync-auth.sql
+```
+
+全新的 CloudBase PG 环境不需要迁移，只执行 `cloudbase/sql/cloud-sync-auth.sql`。
+
 只允许前端读取这些 Vite 变量：
 
 ```dotenv
