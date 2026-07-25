@@ -16,6 +16,7 @@ npm-debug.log*
 
 # Internal SDD handoff artifacts
 .superpowers/sdd/task-*-brief.md
+.superpowers/sdd/review-*.diff
 .superpowers/sdd/review-task-*.diff
 .superpowers/sdd/review-final-*.diff
 .superpowers/sdd/cloudbase/

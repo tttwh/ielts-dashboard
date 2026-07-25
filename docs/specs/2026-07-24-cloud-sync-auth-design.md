@@ -104,8 +104,7 @@ Phase-one language preference is not part of the cloud data model. Keep UI langu
 
 ### goals
 
-- `goal_id uuid primary key`
-- `user_id varchar(64) not null references auth.users(id)`
+- `user_id varchar(64) primary key default auth.uid() references auth.users(id)`
 - `overall_band numeric not null`
 - `listening_band numeric not null`
 - `speaking_band numeric not null`
