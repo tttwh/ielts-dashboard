@@ -618,14 +618,14 @@ Required current schema constraints:
 - Do not add a cloud language or settings table in phase one; UI language remains local-only in the `ielts-dashboard-language` LocalStorage key.
 - `profiles.user_id` and `goals.user_id` are the row keys for their one-row-per-user tables.
 - `daily_records.record_id` is `text not null`, scoped by `user_id`, and the table primary key is `(user_id, record_id)`.
-- `timer_sessions.session_id` is `text primary key` to match app-generated fallback IDs.
+- `timer_sessions.session_id` is `text not null`, scoped by `user_id`, and the table primary key is `(user_id, session_id)` to avoid cross-user timer conflicts.
 - RLS must be enabled on every phase-one user-owned table, with ownership policies based on `user_id = (select auth.uid())`.
 
 - [ ] **Step 2: Create SQL safety checker**
 
 Create `scripts/verify-cloudbase-sql.mjs` from the current checker in `scripts/verify-cloudbase-sql.mjs`.
 
-The checker must cover the five phase-one tables, reject forbidden credential markers, require ownership policies, require `daily_records primary key (user_id, record_id)`, and reject stale UUID-shaped app IDs.
+The checker must cover the five phase-one tables, reject forbidden credential markers, require ownership policies, require `daily_records primary key (user_id, record_id)`, require `timer_sessions primary key (user_id, session_id)`, and reject stale UUID-shaped app IDs.
 
 - [ ] **Step 3: Add script command**
 
@@ -846,7 +846,7 @@ const conflictTargets = {
   profiles: "user_id",
   goals: "user_id",
   daily_records: "user_id,record_id",
-  timer_sessions: "session_id",
+  timer_sessions: "user_id,session_id",
   achievements: "user_id,achievement_id"
 };
 ```

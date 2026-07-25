@@ -147,6 +147,7 @@ Expected:
 - user-owned `user_id` columns use `varchar(64)` and default to `auth.uid()` where inserts need it.
 - `daily_records` uses primary key `(user_id, record_id)`.
 - `timer_sessions.session_id` is `text`.
+- `timer_sessions` uses primary key `(user_id, session_id)`.
 - `anon` has no table-level access to app tables.
 - `authenticated` has only `select`, `insert`, and `update` table-level access to app tables.
 - RLS is enabled on every app table and still filters every row by `auth.uid()`.

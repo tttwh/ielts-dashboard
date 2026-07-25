@@ -226,6 +226,22 @@ const createStateForUser = (userId: string): AppState => {
   };
 };
 
+const createStateWithTimerForUser = (userId: string): AppState => {
+  const state = createStateForUser(userId);
+  const timerSession = createFilledState().timerSessions[0];
+
+  return {
+    ...state,
+    timerSessions: [
+      {
+        ...timerSession,
+        userId,
+        sessionId: "shared-timer-session"
+      }
+    ]
+  };
+};
+
 const createCloudSelectData = (state = createFilledState()): FakeTableData => {
   const rows = appStateToCloudRows(state, "weihao_01");
 
@@ -367,7 +383,7 @@ describe("createCloudRepository", () => {
       {
         tableName: "timer_sessions",
         values: rows.timerSessions,
-        onConflict: "session_id"
+        onConflict: "user_id,session_id"
       },
       {
         tableName: "achievements",
@@ -394,6 +410,28 @@ describe("createCloudRepository", () => {
       }),
       expect.objectContaining({
         record_id: "record-2026-07-24",
+        user_id: "cloud-user-2"
+      })
+    ]);
+  });
+
+  it("keeps identical timer session ids isolated between different users", async () => {
+    const { rdb, tableRows, upserts } = createPersistingFakeRdb();
+    const repository = createCloudRepository(rdb);
+
+    await repository.saveCloudState(createStateWithTimerForUser("cloud-user-1"), "weihao_01");
+    await repository.saveCloudState(createStateWithTimerForUser("cloud-user-2"), "weihao_02");
+
+    const timerSessionUpserts = upserts.filter((upsert) => upsert.tableName === "timer_sessions");
+    expect(timerSessionUpserts).toHaveLength(2);
+    expect(timerSessionUpserts.every((upsert) => upsert.onConflict === "user_id,session_id")).toBe(true);
+    expect(tableRows.timer_sessions).toEqual([
+      expect.objectContaining({
+        session_id: "shared-timer-session",
+        user_id: "cloud-user-1"
+      }),
+      expect.objectContaining({
+        session_id: "shared-timer-session",
         user_id: "cloud-user-2"
       })
     ]);

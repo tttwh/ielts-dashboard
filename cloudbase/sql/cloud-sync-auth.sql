@@ -47,7 +47,7 @@ create table if not exists public.daily_records (
 );
 
 create table if not exists public.timer_sessions (
-  session_id text primary key,
+  session_id text not null,
   user_id varchar(64) not null default auth.uid() references auth.users(id),
   record_date date not null,
   section text not null check (section in ('listening', 'speaking', 'reading', 'writing')),
@@ -59,7 +59,8 @@ create table if not exists public.timer_sessions (
   ended_at timestamptz not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  deleted_at timestamptz
+  deleted_at timestamptz,
+  primary key (user_id, session_id)
 );
 
 create table if not exists public.achievements (

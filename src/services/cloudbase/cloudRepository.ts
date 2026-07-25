@@ -101,7 +101,7 @@ export function createCloudRepository(rdb: CloudBaseRdbClient): CloudRepository 
             rows.timerSessions.length > 0
               ? asUnknownResult(
                   rdb.from<TimerSessionRow>("timer_sessions").upsert(rows.timerSessions, {
-                    onConflict: "session_id"
+                    onConflict: "user_id,session_id"
                   })
                 )
               : Promise.resolve({ data: [], error: null })

@@ -70,7 +70,7 @@ alter table if exists public.timer_sessions
   alter column session_id set not null;
 
 alter table if exists public.timer_sessions
-  add primary key (session_id);
+  add primary key (user_id, session_id);
 
 alter table if exists public.achievements
   drop constraint if exists achievements_pkey;

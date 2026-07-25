@@ -142,7 +142,7 @@ Add a unique index on `(user_id, record_date)` for active records.
 
 ### timer_sessions
 
-- `session_id text primary key`
+- `session_id text not null`
 - `user_id varchar(64) not null default auth.uid() references auth.users(id)`
 - `record_date date not null`
 - `section text not null`
@@ -155,6 +155,8 @@ Add a unique index on `(user_id, record_date)` for active records.
 - `created_at timestamptz not null default now()`
 - `updated_at timestamptz not null default now()`
 - `deleted_at timestamptz`
+
+Primary key: `(user_id, session_id)`.
 
 ### achievements
 

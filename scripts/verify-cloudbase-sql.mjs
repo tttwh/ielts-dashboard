@@ -120,8 +120,15 @@ if (/\brecord_id\s+uuid\b/i.test(dailyRecordsTable)) {
   missing.push("stale daily_records uuid record_id column");
 }
 
-if (!/\bsession_id\s+text\s+primary key\b/i.test(timerSessionsTable)) {
-  missing.push("timer_sessions session_id text primary key");
+if (!/\bsession_id\s+text\s+not null\b/i.test(timerSessionsTable)) {
+  missing.push("timer_sessions session_id text not null");
+}
+
+if (
+  /\bsession_id\s+text\s+primary key\b/i.test(timerSessionsTable) ||
+  !/\bprimary key\s*\(\s*user_id\s*,\s*session_id\s*\)/i.test(timerSessionsTable)
+) {
+  missing.push("timer_sessions primary key (user_id, session_id)");
 }
 
 if (/\bsession_id\s+uuid\b/i.test(timerSessionsTable)) {
