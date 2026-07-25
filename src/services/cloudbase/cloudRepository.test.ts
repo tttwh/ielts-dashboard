@@ -120,14 +120,20 @@ const createFakeRdb = ({
 
   const rdb: CloudBaseRdbClient = {
     from: <T>(tableName: string) => ({
-      eq: (column: string, value: unknown) => {
-        calls.push(`${tableName}.eq(${column},${String(value)})`);
-        return rdb.from<T>(tableName);
+      select: () => {
+        calls.push(`${tableName}.select()`);
+
+        return {
+          eq: async (column: string, value: unknown): Promise<CloudBaseRdbResult<T>> => {
+            calls.push(`${tableName}.eq(${column},${String(value)})`);
+
+            return {
+              data: (selectData[tableName] ?? []) as T[] | T | null,
+              error: selectErrors[tableName] ? { message: selectErrors[tableName] } : null
+            };
+          }
+        };
       },
-      select: async (): Promise<CloudBaseRdbResult<T>> => ({
-        data: (selectData[tableName] ?? []) as T[] | T | null,
-        error: selectErrors[tableName] ? { message: selectErrors[tableName] } : null
-      }),
       upsert: async (values: T | T[], options?: { onConflict?: string }): Promise<CloudBaseRdbResult<T>> => {
         calls.push(`${tableName}.upsert(${options?.onConflict ?? ""})`);
         upserts.push({
@@ -177,6 +183,27 @@ describe("createCloudRepository", () => {
         "achievements.eq(user_id,cloud-user-1)"
       ])
     );
+  });
+
+  it("uses documented CloudBase RDB query order: select before eq", async () => {
+    const { calls, rdb } = createFakeRdb({ selectData: createCloudSelectData() });
+    const repository = createCloudRepository(rdb);
+
+    await repository.loadCloudState("cloud-user-1");
+
+    for (const tableName of [
+      "profiles",
+      "user_settings",
+      "goals",
+      "daily_records",
+      "timer_sessions",
+      "achievements"
+    ]) {
+      expect(calls.indexOf(`${tableName}.select()`)).toBeGreaterThanOrEqual(0);
+      expect(calls.indexOf(`${tableName}.select()`)).toBeLessThan(
+        calls.indexOf(`${tableName}.eq(user_id,cloud-user-1)`)
+      );
+    }
   });
 
   it.each([

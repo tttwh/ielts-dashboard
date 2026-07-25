@@ -38,12 +38,16 @@ for (const table of tables) {
   if (!sql.includes(`create table if not exists public.${table}`)) {
     missing.push(`${table} table`);
   }
+  const tableBody = getCreateTableBody(table);
   const tablePattern = new RegExp(
     `create table if not exists public\\.${table} \\([\\s\\S]*?user_id varchar\\(64\\)[\\s\\S]*?references auth\\.users\\(id\\)`,
     "i",
   );
   if (!tablePattern.test(sql)) {
     missing.push(`${table} varchar(64) auth.users(id) user_id reference`);
+  }
+  if (!/\buser_id\s+varchar\(64\)[^\n,]*\bdefault\s+auth\.uid\(\)/i.test(tableBody)) {
+    missing.push(`${table} user_id default auth.uid()`);
   }
   if (!sql.includes(`alter table public.${table} enable row level security`)) {
     missing.push(`${table} RLS enable`);
@@ -68,7 +72,7 @@ if (/\buser_id\s+uuid\b/i.test(sql)) {
 }
 
 const goalsTable = getCreateTableBody("goals");
-if (!/\buser_id\s+varchar\(64\)\s+primary key\s+references auth\.users\(id\)/i.test(goalsTable)) {
+if (!/\buser_id\s+varchar\(64\)[^\n,]*\bprimary key\b[^\n,]*\breferences auth\.users\(id\)/i.test(goalsTable)) {
   missing.push("goals user_id primary key");
 }
 

@@ -169,7 +169,11 @@ export function createAuthService(authClient: CloudBaseAuthClient): AuthService 
     },
 
     async signOut() {
-      const result = await authClient.signOut();
+      const result = await authClient.signOut({
+        options: {
+          clearStorage: false
+        }
+      });
       if (result) {
         assertCloudBaseOk(result);
       }

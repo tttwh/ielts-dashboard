@@ -195,6 +195,20 @@ describe("CloudBase cloud mappers", () => {
     ]);
   });
 
+  it("writes profile accountStatus to the CloudBase profile status row", () => {
+    const state = {
+      ...createFilledState(),
+      profile: {
+        ...createFilledState().profile,
+        accountStatus: "pending" as const
+      }
+    };
+
+    const rows = appStateToCloudRows(state, "weihao_01");
+
+    expect(rows.profile?.status).toBe("pending");
+  });
+
   it("maps normalized PG rows back to app state", () => {
     const fallback = createDefaultAppState(now);
     const rows = appStateToCloudRows(createFilledState(), "weihao_01");
@@ -212,6 +226,7 @@ describe("CloudBase cloud mappers", () => {
         writing: 6.5
       },
       syncStatus: "synced",
+      accountStatus: "active",
       createdAt: now,
       updatedAt
     });
@@ -289,6 +304,21 @@ describe("CloudBase cloud mappers", () => {
         syncStatus: "synced"
       }
     ]);
+  });
+
+  it("restores CloudBase profile status into app profile accountStatus", () => {
+    const fallback = createDefaultAppState(now);
+    const rows = appStateToCloudRows(createFilledState(), "weihao_01");
+
+    const restored = cloudRowsToAppState(
+      {
+        ...rows,
+        profile: rows.profile ? { ...rows.profile, status: "disabled" } : null
+      },
+      fallback
+    );
+
+    expect(restored.profile.accountStatus).toBe("disabled");
   });
 
   it("uses restored profile user id for fallback goals when goals row is absent", () => {

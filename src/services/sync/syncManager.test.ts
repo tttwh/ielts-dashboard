@@ -434,4 +434,83 @@ describe("sync manager", () => {
       lastSyncedAt: null
     });
   });
+
+  it.each(["disabled", "pending"] as const)(
+    "blocks import before saving when the local account status is %s",
+    async (accountStatus) => {
+      const localState: AppState = {
+        ...createDefaultAppState(now),
+        profile: {
+          ...createDefaultAppState(now).profile,
+          accountStatus
+        }
+      };
+      const { repository } = createRepository();
+      const manager = createSyncManager(repository);
+
+      const result = await manager.importOrLoad("cloud-user-1", localState, "weihao_01");
+
+      expect(repository.loadCloudState).not.toHaveBeenCalled();
+      expect(repository.saveCloudState).not.toHaveBeenCalled();
+      expect(result.state).toEqual(localState);
+      expect(result.syncState).toEqual({
+        mode: "error",
+        message: `Cloud sync is blocked for ${accountStatus} accounts.`,
+        lastSyncedAt: null
+      });
+    }
+  );
+
+  it.each(["disabled", "pending"] as const)(
+    "blocks import save when the loaded cloud account status is %s",
+    async (accountStatus) => {
+      const localState = createDefaultAppState(now);
+      const cloudState: AppState = {
+        ...replaceAppStateUserId(createDefaultAppState(now), "cloud-user-1"),
+        profile: {
+          ...replaceAppStateUserId(createDefaultAppState(now), "cloud-user-1").profile,
+          accountStatus
+        }
+      };
+      const { repository } = createRepository({ cloudState });
+      const manager = createSyncManager(repository);
+
+      const result = await manager.importOrLoad("cloud-user-1", localState, "weihao_01");
+
+      expect(repository.loadCloudState).toHaveBeenCalledWith("cloud-user-1");
+      expect(repository.saveCloudState).not.toHaveBeenCalled();
+      expect(result.state).toEqual(cloudState);
+      expect(result.syncState).toEqual({
+        mode: "error",
+        message: `Cloud sync is blocked for ${accountStatus} accounts.`,
+        lastSyncedAt: null
+      });
+    }
+  );
+
+  it.each(["disabled", "pending"] as const)(
+    "blocks push without overwriting cloud state when the local account status is %s",
+    async (accountStatus) => {
+      const state: AppState = {
+        ...createDefaultAppState(now),
+        profile: {
+          ...createDefaultAppState(now).profile,
+          accountStatus
+        },
+        records: [createRecord({ syncStatus: "pending" })]
+      };
+      const { repository } = createRepository();
+      const manager = createSyncManager(repository);
+
+      const result = await manager.push(state, "weihao_01");
+
+      expect(repository.saveCloudState).not.toHaveBeenCalled();
+      expect(result.state).toEqual(state);
+      expect(result.syncState).toEqual({
+        mode: "error",
+        message: `Cloud sync is blocked for ${accountStatus} accounts.`,
+        lastSyncedAt: null
+      });
+    }
+  );
 });

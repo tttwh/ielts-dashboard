@@ -93,7 +93,7 @@ CloudBase 必须使用 PG mode，不使用传统文档数据库模式。控制�
 4. 为 Web SDK 生成 Publishable Key。
 5. 把本地开发地址和部署地址加入安全来源，例如 `http://127.0.0.1:5173`。
 6. 区域默认使用 `ap-shanghai`，除非实际环境另有要求。
-7. 在 CloudBase PG SQL 控制台执行 `cloudbase/sql/cloud-sync-auth.sql`，创建表、索引、触发器和 RLS 策略。
+7. 在 CloudBase PG SQL 控制台执行 `cloudbase/sql/cloud-sync-auth.sql`，创建表、索引和 RLS 策略。
 
 只允许前端读取这些 Vite 变量：
 

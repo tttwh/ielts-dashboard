@@ -54,6 +54,33 @@ const withUserId = (state: AppState, userId: string): AppState => ({
   }))
 });
 
+const createRecordForUser = (state: AppState, userId: string, words: number): AppState => {
+  const record = recalculateDailyRecordProgress(
+    {
+      ...createEmptyDailyRecord(today, userId, now),
+      words,
+      updatedAt: now,
+      syncStatus: userId === "local-user" ? "local-only" : "synced"
+    },
+    state.dailyGoals
+  );
+
+  return {
+    ...state,
+    profile: {
+      ...state.profile,
+      userId,
+      syncStatus: userId === "local-user" ? "local" : "synced"
+    },
+    dailyGoals: {
+      ...state.dailyGoals,
+      userId,
+      syncStatus: userId === "local-user" ? "local-only" : "synced"
+    },
+    records: [record]
+  };
+};
+
 describe("useDashboardData", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -382,11 +409,15 @@ describe("useDashboardData", () => {
     });
   });
 
-  it("returns to guest sync mode after authenticated sync is cleared", async () => {
-    const repo = createMemoryRepository();
-    const importOrLoad = vi.fn(async (_userId: string, localState: AppState) =>
-      syncedResult(withUserId(localState, "cloud-user-1"))
+  it("restores the pre-auth guest state after authenticated sync enters guest mode", async () => {
+    const guestState = createRecordForUser(createState(), "local-user", 25);
+    const cloudUserAState = createRecordForUser(
+      withUserId(createState(), "cloud-user-a"),
+      "cloud-user-a",
+      900
     );
+    const repo = createMemoryRepository(guestState);
+    const importOrLoad = vi.fn(async () => syncedResult(cloudUserAState));
     const push = vi.fn<SyncManager["push"]>();
     const syncManager: SyncManager = {
       importOrLoad,
@@ -399,6 +430,8 @@ describe("useDashboardData", () => {
     });
 
     expect(result.current.syncState.mode).toBe("synced");
+    expect(result.current.state.profile.userId).toBe("cloud-user-a");
+    expect(result.current.todayRecord.words).toBe(900);
 
     act(() => {
       result.current.enterGuestMode();
@@ -408,6 +441,38 @@ describe("useDashboardData", () => {
       mode: "guest",
       message: null,
       lastSyncedAt: null
+    });
+    expect(result.current.state.profile.userId).toBe("local-user");
+    expect(result.current.todayRecord.words).toBe(25);
+    expect(repo.loadAppState().profile.userId).toBe("local-user");
+    expect(repo.loadAppState().records[0]).toMatchObject({
+      userId: "local-user",
+      words: 25
+    });
+  });
+
+  it("keeps guest edits local after logout instead of marking sync offline", async () => {
+    const guestState = createRecordForUser(createState(), "local-user", 25);
+    const cloudUserAState = createRecordForUser(
+      withUserId(createState(), "cloud-user-a"),
+      "cloud-user-a",
+      900
+    );
+    const repo = createMemoryRepository(guestState);
+    const importOrLoad = vi.fn(async () => syncedResult(cloudUserAState));
+    const push = vi.fn<SyncManager["push"]>();
+    const syncManager: SyncManager = {
+      importOrLoad,
+      push
+    };
+    const { result } = renderHook(() => useDashboardData(repo, today, syncManager));
+
+    await act(async () => {
+      await result.current.syncNow("cloud-user-a", "user-a@example.com");
+    });
+
+    act(() => {
+      result.current.enterGuestMode();
     });
 
     act(() => {
@@ -419,17 +484,91 @@ describe("useDashboardData", () => {
       message: null,
       lastSyncedAt: null
     });
-    expect(repo.loadAppState().records[0]).toMatchObject({
+    expect(result.current.state.profile.userId).toBe("local-user");
+    expect(result.current.todayRecord).toMatchObject({
+      userId: "local-user",
       words: 100,
       syncStatus: "local-only"
     });
+    expect(repo.loadAppState().records[0]).toMatchObject({
+      userId: "local-user",
+      words: 100,
+      syncStatus: "local-only"
+    });
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("imports guest data, not user A data, when user B logs in after user A logout", async () => {
+    const guestState = createRecordForUser(createState(), "local-user", 25);
+    const cloudUserAState = createRecordForUser(
+      withUserId(createState(), "cloud-user-a"),
+      "cloud-user-a",
+      900
+    );
+    const repo = createMemoryRepository(guestState);
+    const importOrLoad = vi.fn(async (userId: string, localState: AppState) => {
+      if (userId === "cloud-user-a") return syncedResult(cloudUserAState);
+      return syncedResult(withUserId(localState, userId));
+    });
+    const push = vi.fn<SyncManager["push"]>();
+    const syncManager: SyncManager = {
+      importOrLoad,
+      push
+    };
+    const { result } = renderHook(() => useDashboardData(repo, today, syncManager));
 
     await act(async () => {
-      await result.current.syncNow("cloud-user-1", "weihao_01");
+      await result.current.syncNow("cloud-user-a", "user-a@example.com");
+    });
+
+    act(() => {
+      result.current.enterGuestMode();
+    });
+    act(() => {
+      result.current.updateTodayRecord({ words: 100 });
+    });
+
+    await act(async () => {
+      await result.current.syncNow("cloud-user-b", "user-b@example.com");
     });
 
     expect(importOrLoad).toHaveBeenCalledTimes(2);
+    expect(importOrLoad.mock.calls[1][1]).toMatchObject({
+      profile: expect.objectContaining({ userId: "local-user" }),
+      records: [
+        expect.objectContaining({
+          userId: "local-user",
+          words: 100
+        })
+      ]
+    });
+    expect(result.current.state.profile.userId).toBe("cloud-user-b");
+    expect(result.current.todayRecord).toMatchObject({
+      userId: "cloud-user-b",
+      words: 100
+    });
     expect(push).not.toHaveBeenCalled();
+  });
+
+  it("uses a fresh guest state when only a cloud-user state is present at logout", () => {
+    const repo = createMemoryRepository(
+      createRecordForUser(withUserId(createState(), "cloud-user-a"), "cloud-user-a", 900)
+    );
+    const syncManager: SyncManager = {
+      importOrLoad: vi.fn(),
+      push: vi.fn()
+    };
+    const { result } = renderHook(() => useDashboardData(repo, today, syncManager));
+
+    act(() => {
+      result.current.enterGuestMode();
+    });
+
+    expect(result.current.syncState.mode).toBe("guest");
+    expect(result.current.state.profile.userId).toBe("local-user");
+    expect(result.current.state.records).toEqual([]);
+    expect(repo.loadAppState().profile.userId).toBe("local-user");
+    expect(repo.loadAppState().records).toEqual([]);
   });
 
   it("ignores an in-flight sync result after returning to guest mode", async () => {
@@ -645,6 +784,59 @@ describe("useDashboardData", () => {
       mode: "error",
       message: "network down",
       lastSyncedAt: null
+    });
+  });
+
+  it("does not let a stale authenticated push restore user A state after logout", async () => {
+    const guestState = createRecordForUser(createState(), "local-user", 25);
+    let resolvePush: (result: SyncResult) => void = () => undefined;
+    const pushPromise = new Promise<SyncResult>((resolve) => {
+      resolvePush = resolve;
+    });
+    const importOrLoad = vi.fn(async (_userId: string, localState: AppState) =>
+      syncedResult(withUserId(localState, "cloud-user-a"))
+    );
+    const push = vi.fn<SyncManager["push"]>(() => pushPromise);
+    const syncManager: SyncManager = {
+      importOrLoad,
+      push
+    };
+    const repo = createMemoryRepository(guestState);
+    const { result } = renderHook(() => useDashboardData(repo, today, syncManager));
+
+    await act(async () => {
+      await result.current.syncNow("cloud-user-a", "user-a@example.com");
+    });
+    act(() => {
+      result.current.updateTodayRecord({ words: 900 });
+    });
+
+    let syncPromise: Promise<void> = Promise.resolve();
+    await act(async () => {
+      syncPromise = result.current.syncNow("cloud-user-a", "user-a@example.com");
+    });
+    const staleUserAState = push.mock.calls[0][0];
+
+    act(() => {
+      result.current.enterGuestMode();
+    });
+
+    await act(async () => {
+      resolvePush(syncedResult(staleUserAState));
+      await syncPromise;
+    });
+
+    expect(result.current.syncState).toEqual({
+      mode: "guest",
+      message: null,
+      lastSyncedAt: null
+    });
+    expect(result.current.state.profile.userId).toBe("local-user");
+    expect(result.current.todayRecord.words).toBe(25);
+    expect(repo.loadAppState().profile.userId).toBe("local-user");
+    expect(repo.loadAppState().records[0]).toMatchObject({
+      userId: "local-user",
+      words: 25
     });
   });
 });

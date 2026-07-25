@@ -35,18 +35,30 @@ function keyColumnsFor(options?: { onConflict?: string }) {
 function createQuery(tableName: string) {
   const filters: Array<{ column: string; value: unknown }> = [];
 
+  const selectRows = (activeFilters: Array<{ column: string; value: unknown }>) =>
+    ok(
+      tableRows(tableName).filter((row) =>
+        activeFilters.every((filter) => row[filter.column] === filter.value)
+      )
+    );
+
   return {
     eq(column: string, value: unknown) {
       filters.push({ column, value });
       return this;
     },
 
-    async select() {
-      const rows = tableRows(tableName).filter((row) =>
-        filters.every((filter) => row[filter.column] === filter.value)
-      );
+    select() {
+      const selectedFilters = [...filters];
 
-      return ok(rows);
+      return {
+        eq(column: string, value: unknown) {
+          return selectRows([...selectedFilters, { column, value }]);
+        },
+        then(resolve: (value: ReturnType<typeof selectRows>) => void) {
+          return Promise.resolve(selectRows(selectedFilters)).then(resolve);
+        }
+      };
     },
 
     async upsert(values: Record<string, unknown> | Array<Record<string, unknown>>, options?: { onConflict?: string }) {

@@ -201,12 +201,15 @@ function DashboardApp() {
 
     const syncKey = `${authSession.user.uid}\u0000${accountName ?? ""}`;
     if (lastAuthSyncKeyRef.current === syncKey) {
+      if (syncState.mode === "offline") {
+        void syncNow(authSession.user.uid, accountName);
+      }
       return;
     }
 
     lastAuthSyncKeyRef.current = syncKey;
     void syncNow(authSession.user.uid, accountName);
-  }, [accountName, authSession.status, authSession.user, enterGuestMode, syncNow]);
+  }, [accountName, authSession.status, authSession.user, enterGuestMode, syncNow, syncState.mode]);
 
   const handleViewChange = (view: DashboardView) => {
     setActiveView(view);

@@ -40,12 +40,12 @@ export function createCloudRepository(rdb: CloudBaseRdbClient): CloudRepository 
   return {
     async loadCloudState(userId) {
       const [profiles, userSettings, goals, records, timerSessions, achievements] = await Promise.all([
-        rdb.from<ProfileRow>("profiles").eq("user_id", userId).select(),
-        rdb.from<UserSettingsRow>("user_settings").eq("user_id", userId).select(),
-        rdb.from<GoalsRow>("goals").eq("user_id", userId).select(),
-        rdb.from<DailyRecordRow>("daily_records").eq("user_id", userId).select(),
-        rdb.from<TimerSessionRow>("timer_sessions").eq("user_id", userId).select(),
-        rdb.from<AchievementRow>("achievements").eq("user_id", userId).select()
+        rdb.from<ProfileRow>("profiles").select().eq("user_id", userId),
+        rdb.from<UserSettingsRow>("user_settings").select().eq("user_id", userId),
+        rdb.from<GoalsRow>("goals").select().eq("user_id", userId),
+        rdb.from<DailyRecordRow>("daily_records").select().eq("user_id", userId),
+        rdb.from<TimerSessionRow>("timer_sessions").select().eq("user_id", userId),
+        rdb.from<AchievementRow>("achievements").select().eq("user_id", userId)
       ]);
 
       const profileRows = assertResult("profiles", profiles);

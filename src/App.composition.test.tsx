@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createDefaultAppState } from "./domain/defaults";
 import { createEmptyDailyRecord } from "./domain/progress";
+import type { SyncState } from "./services/sync/syncTypes";
 import type { AppRepository } from "./services/storage/storageTypes";
 
 const mocks = vi.hoisted(() => {
@@ -195,7 +196,7 @@ function arrangeAuthSession(overrides: Record<string, unknown> = {}) {
   return session;
 }
 
-function arrangeDashboardData() {
+function arrangeDashboardData(overrides: Record<string, unknown> = {}) {
   const state = createDefaultAppState("2026-07-22T00:00:00.000Z");
   const todayRecord = createEmptyDailyRecord(
     "2026-07-22",
@@ -208,14 +209,14 @@ function arrangeDashboardData() {
   const addTimerSession = vi.fn();
   const enterGuestMode = vi.fn();
   const syncNow = vi.fn().mockResolvedValue(undefined);
-  const syncState = {
+  const syncState: SyncState = {
     lastSyncedAt: null,
     message: null,
     mode: "guest"
   };
 
   state.records = [{ ...todayRecord, xpEarned: 135 }];
-  mocks.useDashboardData.mockReturnValue({
+  const dashboardData = {
     addTimerSession,
     enterGuestMode,
     latestUnlockedAchievementId: "first-steps",
@@ -225,10 +226,14 @@ function arrangeDashboardData() {
     todayRecord,
     updateDailyGoals,
     updateProfile,
-    updateTodayRecord
-  });
+    updateTodayRecord,
+    ...overrides
+  };
+
+  mocks.useDashboardData.mockReturnValue(dashboardData);
 
   return {
+    dashboardData,
     addTimerSession,
     enterGuestMode,
     state,
@@ -351,6 +356,49 @@ describe("App composition", () => {
       expect(data.syncNow).toHaveBeenCalledWith("cloud-user-1", "weihao@example.com");
     });
     expect(authSession.user).toMatchObject({ uid: "cloud-user-1" });
+  });
+
+  it("auto-syncs authenticated local edits after sync state turns offline", async () => {
+    const cloudConfig = {
+      accessKey: "publishable-test-key",
+      envId: "test-env",
+      region: "ap-shanghai"
+    };
+    mocks.readCloudBaseConfig.mockReturnValue(cloudConfig);
+    const data = arrangeDashboardData({
+      syncState: {
+        lastSyncedAt: "2026-07-22T07:59:00.000Z",
+        message: null,
+        mode: "synced"
+      }
+    });
+    arrangeAuthSession({
+      status: "authenticated",
+      user: {
+        accountName: null,
+        email: "weihao@example.com",
+        uid: "cloud-user-1",
+        username: null
+      }
+    });
+    const { rerender } = render(<App />);
+
+    await waitFor(() => {
+      expect(data.syncNow).toHaveBeenCalledWith("cloud-user-1", "weihao@example.com");
+    });
+    data.syncNow.mockClear();
+
+    data.dashboardData.syncState = {
+      lastSyncedAt: "2026-07-22T07:59:00.000Z",
+      message: null,
+      mode: "offline"
+    };
+    rerender(<App />);
+
+    await waitFor(() => {
+      expect(data.syncNow).toHaveBeenCalledWith("cloud-user-1", "weihao@example.com");
+    });
+    expect(data.syncNow).toHaveBeenCalledTimes(1);
   });
 
   it("tells dashboard data to return to guest sync mode when auth is unauthenticated", async () => {

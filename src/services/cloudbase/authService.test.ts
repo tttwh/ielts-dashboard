@@ -202,7 +202,11 @@ describe("createAuthService", () => {
 
     await service.signOut();
 
-    expect(signOut).toHaveBeenCalled();
+    expect(signOut).toHaveBeenCalledWith({
+      options: {
+        clearStorage: false
+      }
+    });
   });
 
   it("adapts CloudBase auth state changes to user listeners", () => {

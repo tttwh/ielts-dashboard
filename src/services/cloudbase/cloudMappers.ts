@@ -116,7 +116,7 @@ export function appStateToCloudRows(state: AppState, accountName: string | null)
       user_id: state.profile.userId,
       account_name: accountName,
       email: null,
-      status: "active",
+      status: state.profile.accountStatus ?? "active",
       display_name: null,
       created_at: state.profile.createdAt,
       updated_at: state.profile.updatedAt
@@ -209,6 +209,7 @@ export function cloudRowsToAppState(rows: CloudRows, fallbackState: AppState): A
           }
         : cloneSectionTargets(fallbackState.profile.sectionTargets),
       syncStatus: profile || goals ? "synced" : fallbackState.profile.syncStatus,
+      accountStatus: profile?.status ?? fallbackState.profile.accountStatus,
       createdAt: profile?.created_at ?? fallbackState.profile.createdAt,
       updatedAt: profile?.updated_at ?? fallbackState.profile.updatedAt
     },

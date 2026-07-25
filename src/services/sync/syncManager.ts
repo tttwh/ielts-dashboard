@@ -32,6 +32,16 @@ const failed = (state: AppState, error: unknown): SyncResult => ({
   }
 });
 
+const blockingAccountStatus = (state: AppState) => {
+  const status = state.profile.accountStatus;
+  return status === "disabled" || status === "pending" ? status : null;
+};
+
+const blockedAccountSync = (
+  state: AppState,
+  status: NonNullable<AppState["profile"]["accountStatus"]>
+): SyncResult => failed(state, new Error(`Cloud sync is blocked for ${status} accounts.`));
+
 const newerByUpdatedAt = <T extends { updatedAt: string }>(localItem: T, cloudItem: T): T =>
   localItem.updatedAt > cloudItem.updatedAt ? localItem : cloudItem;
 
@@ -145,8 +155,18 @@ export function markAppStateSynced(state: AppState): AppState {
 export function createSyncManager(repository: CloudRepository): SyncManager {
   return {
     async importOrLoad(userId, localState, accountName) {
+      const localBlockingStatus = blockingAccountStatus(localState);
+      if (localBlockingStatus) {
+        return blockedAccountSync(localState, localBlockingStatus);
+      }
+
       try {
         const cloudState = await repository.loadCloudState(userId);
+        const cloudBlockingStatus = cloudState ? blockingAccountStatus(cloudState) : null;
+        if (cloudBlockingStatus && cloudState) {
+          return blockedAccountSync(cloudState, cloudBlockingStatus);
+        }
+
         const localStateForUser = replaceAppStateUserId(localState, userId);
         const nextState = markAppStateSynced(
           cloudState ? mergeAppStates(localStateForUser, cloudState) : localStateForUser
@@ -161,6 +181,11 @@ export function createSyncManager(repository: CloudRepository): SyncManager {
     },
 
     async push(state, accountName) {
+      const localBlockingStatus = blockingAccountStatus(state);
+      if (localBlockingStatus) {
+        return blockedAccountSync(state, localBlockingStatus);
+      }
+
       try {
         const nextState = markAppStateSynced(state);
 

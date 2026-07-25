@@ -1,7 +1,7 @@
 create extension if not exists pgcrypto;
 
 create table if not exists public.profiles (
-  user_id varchar(64) primary key references auth.users(id),
+  user_id varchar(64) primary key default auth.uid() references auth.users(id),
   account_name text,
   email text,
   status text not null default 'active' check (status in ('active', 'disabled', 'pending')),
@@ -11,14 +11,14 @@ create table if not exists public.profiles (
 );
 
 create table if not exists public.user_settings (
-  user_id varchar(64) primary key references auth.users(id),
+  user_id varchar(64) primary key default auth.uid() references auth.users(id),
   language text not null default 'zh-CN' check (language in ('zh-CN', 'en')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
 create table if not exists public.goals (
-  user_id varchar(64) primary key references auth.users(id),
+  user_id varchar(64) primary key default auth.uid() references auth.users(id),
   overall_band numeric not null,
   listening_band numeric not null,
   speaking_band numeric not null,
@@ -36,7 +36,7 @@ create table if not exists public.goals (
 
 create table if not exists public.daily_records (
   record_id uuid primary key default gen_random_uuid(),
-  user_id varchar(64) not null references auth.users(id),
+  user_id varchar(64) not null default auth.uid() references auth.users(id),
   record_date date not null,
   words_memorized integer not null,
   speaking_topics integer not null,
@@ -54,7 +54,7 @@ create table if not exists public.daily_records (
 
 create table if not exists public.timer_sessions (
   session_id uuid primary key default gen_random_uuid(),
-  user_id varchar(64) not null references auth.users(id),
+  user_id varchar(64) not null default auth.uid() references auth.users(id),
   record_date date not null,
   section text not null check (section in ('listening', 'speaking', 'reading', 'writing')),
   source text not null check (source in ('in-app-timer', 'manual-external')),
@@ -70,7 +70,7 @@ create table if not exists public.timer_sessions (
 
 create table if not exists public.achievements (
   achievement_id text not null,
-  user_id varchar(64) not null references auth.users(id),
+  user_id varchar(64) not null default auth.uid() references auth.users(id),
   name text not null,
   description text not null,
   category text not null check (category in ('streak', 'skill', 'milestone', 'balance')),

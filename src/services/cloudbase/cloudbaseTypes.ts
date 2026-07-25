@@ -51,9 +51,12 @@ export interface CloudBaseRdbResult<T> {
   error: { message?: string; code?: string } | null;
 }
 
+export interface CloudBaseRdbFilterQuery<T> {
+  eq(column: string, value: unknown): Promise<CloudBaseRdbResult<T>>;
+}
+
 export interface CloudBaseRdbQuery<T> {
-  select(columns?: string, options?: Record<string, unknown>): Promise<CloudBaseRdbResult<T>>;
-  eq(column: string, value: unknown): CloudBaseRdbQuery<T>;
+  select(columns?: string, options?: Record<string, unknown>): CloudBaseRdbFilterQuery<T>;
   upsert(values: T | T[], options?: { onConflict?: string }): Promise<CloudBaseRdbResult<T>>;
 }
 
