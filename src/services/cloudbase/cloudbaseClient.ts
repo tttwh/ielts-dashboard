@@ -18,9 +18,14 @@ export function readCloudBaseConfig(env: ImportMetaEnv = import.meta.env): Cloud
 }
 
 export function createCloudBaseClient(config: CloudBaseConfig = readCloudBaseConfig()): CloudBaseClient {
-  return cloudbase.init({
+  const sdkClient = cloudbase.init({
     env: config.envId,
     region: config.region,
     accessKey: config.accessKey
-  }) as unknown as CloudBaseClient;
+  }) as unknown as CloudBaseClient & { auth: CloudBaseClient["auth"] | (() => CloudBaseClient["auth"]) };
+
+  return {
+    ...sdkClient,
+    auth: typeof sdkClient.auth === "function" ? sdkClient.auth() : sdkClient.auth
+  };
 }

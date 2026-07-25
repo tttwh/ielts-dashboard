@@ -69,6 +69,27 @@ describe("createCloudBaseClient", () => {
       region: "ap-shanghai",
       accessKey: "publishable-test-key"
     });
-    expect(client).toBe(sdkClient);
+    expect(client.auth).toBe(sdkClient.auth);
+    expect(client.rdb).toBe(sdkClient.rdb);
+  });
+
+  it("adapts SDK clients that expose auth as a function", () => {
+    const authClient = {
+      getSession: vi.fn()
+    };
+    const sdkClient = {
+      auth: vi.fn(() => authClient),
+      rdb: vi.fn()
+    };
+    cloudbaseInit.mockReturnValue(sdkClient);
+
+    const client = createCloudBaseClient({
+      envId: "test-env",
+      region: "ap-shanghai",
+      accessKey: "publishable-test-key"
+    });
+
+    expect(client.auth).toBe(authClient);
+    expect(sdkClient.auth).toHaveBeenCalledOnce();
   });
 });
