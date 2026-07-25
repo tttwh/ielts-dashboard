@@ -100,12 +100,7 @@ All user-owned tables use `user_id varchar(64) not null default auth.uid()`. Clo
 - `created_at timestamptz not null default now()`
 - `updated_at timestamptz not null default now()`
 
-### user_settings
-
-- `user_id varchar(64) primary key references auth.users(id)`
-- `language text not null default 'zh-CN'`
-- `created_at timestamptz not null default now()`
-- `updated_at timestamptz not null default now()`
+Phase-one language preference is not part of the cloud data model. Keep UI language local-only in the `ielts-dashboard-language` LocalStorage key; any future remote preference storage needs a separate design update.
 
 ### goals
 

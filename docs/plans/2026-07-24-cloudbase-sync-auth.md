@@ -604,225 +604,28 @@ git commit -m "feat: add cloudbase auth service"
 
 **Interfaces:**
 - Produces:
-  - SQL tables: `profiles`, `user_settings`, `goals`, `daily_records`, `timer_sessions`, `achievements`
+  - SQL tables: `profiles`, `goals`, `daily_records`, `timer_sessions`, `achievements`
   - RLS ownership policies for all user-owned tables
   - Script command: `node scripts/verify-cloudbase-sql.mjs`
 
 - [ ] **Step 1: Create SQL schema**
 
-Create `cloudbase/sql/cloud-sync-auth.sql`:
+Create `cloudbase/sql/cloud-sync-auth.sql` from the current phase-one schema in `cloudbase/sql/cloud-sync-auth.sql`.
 
-```sql
-create extension if not exists pgcrypto;
+Required current schema constraints:
 
-create table if not exists public.profiles (
-  user_id varchar(64) primary key references auth.users(id),
-  account_name text,
-  email text,
-  status text not null default 'active' check (status in ('active', 'disabled', 'pending')),
-  display_name text,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-create table if not exists public.user_settings (
-  user_id varchar(64) primary key references auth.users(id),
-  language text not null default 'zh-CN' check (language in ('zh-CN', 'en')),
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-create table if not exists public.goals (
-  goal_id uuid primary key default gen_random_uuid(),
-  user_id varchar(64) not null references auth.users(id),
-  overall_band numeric not null,
-  listening_band numeric not null,
-  speaking_band numeric not null,
-  reading_band numeric not null,
-  writing_band numeric not null,
-  words_target integer not null,
-  speaking_topics_target integer not null,
-  listening_tests_target integer not null,
-  corpus_minutes_target integer not null,
-  section_minutes_target jsonb not null,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  deleted_at timestamptz
-);
-
-create table if not exists public.daily_records (
-  record_id text not null,
-  user_id varchar(64) not null default auth.uid() references auth.users(id),
-  record_date date not null,
-  words_memorized integer not null,
-  speaking_topics integer not null,
-  listening_tests integer not null,
-  corpus_minutes integer not null,
-  section_minutes jsonb not null,
-  reading_overtime_minutes integer not null,
-  completion_rate numeric not null,
-  is_all_clear boolean not null,
-  xp_earned integer not null,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  deleted_at timestamptz,
-  primary key (user_id, record_id)
-);
-
-create table if not exists public.timer_sessions (
-  session_id text primary key,
-  user_id varchar(64) not null default auth.uid() references auth.users(id),
-  record_date date not null,
-  section text not null check (section in ('listening', 'speaking', 'reading', 'writing')),
-  source text not null check (source in ('in-app-timer', 'manual-external')),
-  planned_minutes integer not null,
-  actual_minutes integer not null,
-  overtime_minutes integer not null,
-  started_at timestamptz not null,
-  ended_at timestamptz not null,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  deleted_at timestamptz
-);
-
-create table if not exists public.achievements (
-  achievement_id text not null,
-  user_id varchar(64) not null references auth.users(id),
-  name text not null,
-  description text not null,
-  category text not null check (category in ('streak', 'skill', 'milestone', 'balance')),
-  unlocked_at timestamptz,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  deleted_at timestamptz,
-  primary key (user_id, achievement_id)
-);
-
-create unique index if not exists daily_records_user_date_active_idx
-  on public.daily_records (user_id, record_date)
-  where deleted_at is null;
-
-create unique index if not exists goals_one_active_per_user_idx
-  on public.goals (user_id)
-  where deleted_at is null;
-
-alter table public.profiles enable row level security;
-alter table public.user_settings enable row level security;
-alter table public.goals enable row level security;
-alter table public.daily_records enable row level security;
-alter table public.timer_sessions enable row level security;
-alter table public.achievements enable row level security;
-
-create policy profiles_select_own on public.profiles
-  for select to authenticated
-  using (user_id = (select auth.uid()));
-create policy profiles_insert_own on public.profiles
-  for insert to authenticated
-  with check (user_id = (select auth.uid()));
-create policy profiles_update_own on public.profiles
-  for update to authenticated
-  using (user_id = (select auth.uid()))
-  with check (user_id = (select auth.uid()));
-
-create policy user_settings_select_own on public.user_settings
-  for select to authenticated
-  using (user_id = (select auth.uid()));
-create policy user_settings_insert_own on public.user_settings
-  for insert to authenticated
-  with check (user_id = (select auth.uid()));
-create policy user_settings_update_own on public.user_settings
-  for update to authenticated
-  using (user_id = (select auth.uid()))
-  with check (user_id = (select auth.uid()));
-
-create policy goals_select_own on public.goals
-  for select to authenticated
-  using (user_id = (select auth.uid()));
-create policy goals_insert_own on public.goals
-  for insert to authenticated
-  with check (user_id = (select auth.uid()));
-create policy goals_update_own on public.goals
-  for update to authenticated
-  using (user_id = (select auth.uid()))
-  with check (user_id = (select auth.uid()));
-
-create policy daily_records_select_own on public.daily_records
-  for select to authenticated
-  using (user_id = (select auth.uid()));
-create policy daily_records_insert_own on public.daily_records
-  for insert to authenticated
-  with check (user_id = (select auth.uid()));
-create policy daily_records_update_own on public.daily_records
-  for update to authenticated
-  using (user_id = (select auth.uid()))
-  with check (user_id = (select auth.uid()));
-
-create policy timer_sessions_select_own on public.timer_sessions
-  for select to authenticated
-  using (user_id = (select auth.uid()));
-create policy timer_sessions_insert_own on public.timer_sessions
-  for insert to authenticated
-  with check (user_id = (select auth.uid()));
-create policy timer_sessions_update_own on public.timer_sessions
-  for update to authenticated
-  using (user_id = (select auth.uid()))
-  with check (user_id = (select auth.uid()));
-
-create policy achievements_select_own on public.achievements
-  for select to authenticated
-  using (user_id = (select auth.uid()));
-create policy achievements_insert_own on public.achievements
-  for insert to authenticated
-  with check (user_id = (select auth.uid()));
-create policy achievements_update_own on public.achievements
-  for update to authenticated
-  using (user_id = (select auth.uid()))
-  with check (user_id = (select auth.uid()));
-```
+- Phase one has five cloud tables: `profiles`, `goals`, `daily_records`, `timer_sessions`, `achievements`.
+- Do not add a cloud language or settings table in phase one; UI language remains local-only in the `ielts-dashboard-language` LocalStorage key.
+- `profiles.user_id` and `goals.user_id` are the row keys for their one-row-per-user tables.
+- `daily_records.record_id` is `text not null`, scoped by `user_id`, and the table primary key is `(user_id, record_id)`.
+- `timer_sessions.session_id` is `text primary key` to match app-generated fallback IDs.
+- RLS must be enabled on every phase-one user-owned table, with ownership policies based on `user_id = (select auth.uid())`.
 
 - [ ] **Step 2: Create SQL safety checker**
 
-Create `scripts/verify-cloudbase-sql.mjs`:
+Create `scripts/verify-cloudbase-sql.mjs` from the current checker in `scripts/verify-cloudbase-sql.mjs`.
 
-```js
-import { readFileSync } from "node:fs";
-
-const sql = readFileSync("cloudbase/sql/cloud-sync-auth.sql", "utf8");
-const tables = [
-  "profiles",
-  "user_settings",
-  "goals",
-  "daily_records",
-  "timer_sessions",
-  "achievements"
-];
-const forbidden = ["secretId", "secretKey", "TENCENTCLOUD_SECRETID", "TENCENTCLOUD_SECRETKEY"];
-
-const missing = [];
-for (const table of tables) {
-  if (!sql.includes(`alter table public.${table} enable row level security`)) {
-    missing.push(`${table} RLS enable`);
-  }
-  if (!sql.includes(`${table}_select_own`)) missing.push(`${table} select policy`);
-  if (!sql.includes(`${table}_insert_own`)) missing.push(`${table} insert policy`);
-  if (!sql.includes(`${table}_update_own`)) missing.push(`${table} update policy`);
-}
-
-for (const value of forbidden) {
-  if (sql.includes(value)) missing.push(`forbidden credential marker ${value}`);
-}
-
-if (!sql.includes("with check (user_id = (select auth.uid()))")) {
-  missing.push("ownership WITH CHECK policy");
-}
-
-if (missing.length > 0) {
-  console.error(`CloudBase SQL verification failed:\n${missing.join("\n")}`);
-  process.exit(1);
-}
-
-console.log("CloudBase SQL verification passed");
-```
+The checker must cover the five phase-one tables, reject forbidden credential markers, require ownership policies, require `daily_records primary key (user_id, record_id)`, and reject stale UUID-shaped app IDs.
 
 - [ ] **Step 3: Add script command**
 
@@ -854,8 +657,8 @@ In CloudBase PG SQL console, run the SQL against a test environment only.
 Expected:
 
 - SQL runs without syntax errors.
-- All six tables appear.
-- RLS is enabled on all six tables.
+- All five phase-one tables appear.
+- RLS is enabled on all five phase-one tables.
 
 If CloudBase PG rejects `auth.users(id)` or `auth.uid()`, stop the task, replace only those auth references with the exact CloudBase PG documented equivalent, rerun this step, and keep the ownership policy shape identical.
 
@@ -1030,88 +833,23 @@ Expected: fails because repository file does not exist.
 
 - [ ] **Step 3: Implement repository**
 
-Create `src/services/cloudbase/cloudRepository.ts`:
+Create `src/services/cloudbase/cloudRepository.ts` using the current implementation pattern in `src/services/cloudbase/cloudRepository.ts`.
+
+Repository rules:
+
+- `loadCloudState` selects only the five phase-one cloud tables: `profiles`, `goals`, `daily_records`, `timer_sessions`, `achievements`.
+- Phase-one sync does not read or write remote language settings; UI language remains local-only in `ielts-dashboard-language`.
+- `saveCloudState` uses the schema-owned conflict targets:
 
 ```ts
-import { createDefaultAppState } from "../../domain/defaults";
-import type { AppState } from "../storage/storageTypes";
-import type { CloudBaseRdbClient, CloudBaseRdbResult } from "./cloudbaseTypes";
-import {
-  appStateToCloudRows,
-  cloudRowsToAppState,
-  type AchievementRow,
-  type DailyRecordRow,
-  type GoalsRow,
-  type ProfileRow,
-  type TimerSessionRow,
-  type UserSettingsRow
-} from "./cloudMappers";
-
-export interface CloudRepository {
-  loadCloudState(userId: string): Promise<AppState | null>;
-  saveCloudState(state: AppState, accountName: string | null): Promise<void>;
-}
-
-const assertResult = <T>(tableName: string, result: CloudBaseRdbResult<T>) => {
-  if (result.error) {
-    throw new Error(`${tableName}: ${result.error.message ?? "CloudBase request failed"}`);
-  }
-  return Array.isArray(result.data) ? result.data : result.data ? [result.data] : [];
+const conflictTargets = {
+  profiles: "user_id",
+  goals: "user_id",
+  daily_records: "user_id,record_id",
+  timer_sessions: "session_id",
+  achievements: "user_id,achievement_id"
 };
-
-export function createCloudRepository(rdb: CloudBaseRdbClient): CloudRepository {
-  return {
-    async loadCloudState(userId) {
-      const [profiles, settings, goals, records, timerSessions, achievements] = await Promise.all([
-        rdb.from<ProfileRow>("profiles").eq("user_id", userId).select(),
-        rdb.from<UserSettingsRow>("user_settings").eq("user_id", userId).select(),
-        rdb.from<GoalsRow>("goals").eq("user_id", userId).select(),
-        rdb.from<DailyRecordRow>("daily_records").eq("user_id", userId).select(),
-        rdb.from<TimerSessionRow>("timer_sessions").eq("user_id", userId).select(),
-        rdb.from<AchievementRow>("achievements").eq("user_id", userId).select()
-      ]);
-
-      const profileRows = assertResult("profiles", profiles);
-      const goalsRows = assertResult("goals", goals);
-      if (profileRows.length === 0 || goalsRows.length === 0) return null;
-
-      return cloudRowsToAppState(
-        {
-          profile: profileRows[0],
-          settings: assertResult("user_settings", settings)[0] ?? null,
-          goals: goalsRows[0],
-          records: assertResult("daily_records", records),
-          timerSessions: assertResult("timer_sessions", timerSessions),
-          achievements: assertResult("achievements", achievements)
-        },
-        createDefaultAppState(new Date().toISOString())
-      );
-    },
-    async saveCloudState(state, accountName) {
-      const rows = appStateToCloudRows(state, accountName);
-      const writes = [
-        rdb.from<ProfileRow>("profiles").upsert(rows.profile, { onConflict: "user_id" }),
-        rdb.from<UserSettingsRow>("user_settings").upsert(rows.settings, { onConflict: "user_id" }),
-        rdb.from<GoalsRow>("goals").upsert(rows.goals, { onConflict: "goal_id" }),
-        rows.records.length > 0
-          ? rdb.from<DailyRecordRow>("daily_records").upsert(rows.records, { onConflict: "record_id" })
-          : Promise.resolve({ data: [], error: null }),
-        rows.timerSessions.length > 0
-          ? rdb.from<TimerSessionRow>("timer_sessions").upsert(rows.timerSessions, { onConflict: "session_id" })
-          : Promise.resolve({ data: [], error: null }),
-        rows.achievements.length > 0
-          ? rdb.from<AchievementRow>("achievements").upsert(rows.achievements, { onConflict: "user_id,achievement_id" })
-          : Promise.resolve({ data: [], error: null })
-      ];
-
-      const results = await Promise.all(writes);
-      results.forEach((result, index) => assertResult(`write-${index}`, result));
-    }
-  };
-}
 ```
-
-Adjust import paths if TypeScript reports a path mismatch.
 
 - [ ] **Step 4: Verify Task 5**
 
