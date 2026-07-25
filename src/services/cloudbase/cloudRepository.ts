@@ -91,7 +91,7 @@ export function createCloudRepository(rdb: CloudBaseRdbClient): CloudRepository 
           result:
             rows.records.length > 0
               ? asUnknownResult(
-                  rdb.from<DailyRecordRow>("daily_records").upsert(rows.records, { onConflict: "record_id" })
+                  rdb.from<DailyRecordRow>("daily_records").upsert(rows.records, { onConflict: "user_id,record_id" })
                 )
               : Promise.resolve({ data: [], error: null })
         },

@@ -23,6 +23,57 @@ export interface EmailSignUpChallenge {
   verifyOtp: NonNullable<CloudBaseAuthResponseData["verifyOtp"]>;
 }
 
+export type AuthErrorCode =
+  | "authentication-failed"
+  | "cloud-unavailable"
+  | "invalid-email"
+  | "invalid-password"
+  | "invalid-username"
+  | "invalid-verification-code"
+  | "missing-sign-up-challenge"
+  | "verification-unavailable";
+
+const authErrorCodes: Record<AuthErrorCode, true> = {
+  "authentication-failed": true,
+  "cloud-unavailable": true,
+  "invalid-email": true,
+  "invalid-password": true,
+  "invalid-username": true,
+  "invalid-verification-code": true,
+  "missing-sign-up-challenge": true,
+  "verification-unavailable": true
+};
+
+export class AuthError extends Error {
+  readonly code: AuthErrorCode;
+  readonly debugMessage: string | null;
+
+  constructor(code: AuthErrorCode, debugMessage: string | null = null) {
+    super(code);
+    this.name = "AuthError";
+    this.code = code;
+    this.debugMessage = debugMessage;
+  }
+}
+
+const isAuthErrorCode = (value: unknown): value is AuthErrorCode =>
+  typeof value === "string" && value in authErrorCodes;
+
+export const authErrorCodeFrom = (error: unknown): AuthErrorCode => {
+  if (error instanceof AuthError) {
+    return error.code;
+  }
+
+  if (typeof error === "object" && error !== null && "code" in error) {
+    const code = (error as { code?: unknown }).code;
+    if (isAuthErrorCode(code)) {
+      return code;
+    }
+  }
+
+  return "authentication-failed";
+};
+
 export interface AuthService {
   getCurrentUser(): Promise<CloudBaseAuthUser | null>;
   startEmailSignUp(credentials: EmailSignUpCredentials): Promise<EmailSignUpChallenge>;
@@ -58,19 +109,22 @@ export function validatePassword(password: string): string | null {
 
 const assertCloudBaseOk = (result: CloudBaseAuthResponse): CloudBaseAuthResponseData | null => {
   if (result.error) {
-    throw new Error(result.error.message ?? "CloudBase authentication failed.");
+    throw new AuthError(
+      "authentication-failed",
+      result.error.message ?? "CloudBase authentication failed."
+    );
   }
   return result.data;
 };
 
 const assertValidEmail = (email: string) => {
   const emailError = validateEmail(email);
-  if (emailError) throw new Error(emailError);
+  if (emailError) throw new AuthError("invalid-email", emailError);
 };
 
 const assertValidPassword = (password: string) => {
   const passwordError = validatePassword(password);
-  if (passwordError) throw new Error(passwordError);
+  if (passwordError) throw new AuthError("invalid-password", passwordError);
 };
 
 const normalizeCloudBaseUser = (
@@ -92,7 +146,10 @@ const normalizeCloudBaseUser = (
 const requireUser = (user: CloudBaseRawAuthUser | null | undefined): CloudBaseAuthUser => {
   const normalizedUser = normalizeCloudBaseUser(user);
   if (!normalizedUser) {
-    throw new Error("CloudBase did not return an authenticated user.");
+    throw new AuthError(
+      "authentication-failed",
+      "CloudBase did not return an authenticated user."
+    );
   }
   return normalizedUser;
 };
@@ -109,7 +166,7 @@ export function createAuthService(authClient: CloudBaseAuthClient): AuthService 
 
       assertValidEmail(email);
       const usernameError = validateUsername(username ?? "");
-      if (usernameError) throw new Error(usernameError);
+      if (usernameError) throw new AuthError("invalid-username", usernameError);
       assertValidPassword(credentials.password);
 
       const signUpInput: { email: string; password: string; username?: string } = {
@@ -122,7 +179,10 @@ export function createAuthService(authClient: CloudBaseAuthClient): AuthService 
 
       const data = assertCloudBaseOk(await authClient.signUp(signUpInput));
       if (!data?.verifyOtp) {
-        throw new Error("CloudBase did not return a verification handler.");
+        throw new AuthError(
+          "verification-unavailable",
+          "CloudBase did not return a verification handler."
+        );
       }
 
       return {
@@ -135,7 +195,7 @@ export function createAuthService(authClient: CloudBaseAuthClient): AuthService 
     async completeEmailSignUp(challenge, verificationCode) {
       const token = verificationCode.trim();
       if (!/^\d{6}$/.test(token)) {
-        throw new Error("Verification code must be 6 digits.");
+        throw new AuthError("invalid-verification-code", "Verification code must be 6 digits.");
       }
 
       const data = assertCloudBaseOk(
@@ -155,7 +215,7 @@ export function createAuthService(authClient: CloudBaseAuthClient): AuthService 
         assertValidEmail(account);
       } else {
         const usernameError = validateUsername(account);
-        if (usernameError) throw new Error(usernameError);
+        if (usernameError) throw new AuthError("invalid-username", usernameError);
       }
       assertValidPassword(credentials.password);
 

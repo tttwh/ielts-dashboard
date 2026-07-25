@@ -175,13 +175,38 @@ describe("createAuthService", () => {
     });
   });
 
+  it("wraps CloudBase auth failures in app error codes without exposing the raw message", async () => {
+    const rawMessage = "Invalid login credentials.";
+    const client = fakeAuthClient({
+      signInWithPassword: vi.fn(async () => ({
+        data: null,
+        error: { message: rawMessage }
+      }))
+    });
+    const service = createAuthService(client);
+    let caughtError: unknown;
+
+    try {
+      await service.signIn({ account: "weihao@example.com", password: "abc12345" });
+    } catch (error) {
+      caughtError = error;
+    }
+
+    expect(caughtError).toBeInstanceOf(Error);
+    expect(caughtError).toMatchObject({
+      code: "authentication-failed",
+      debugMessage: rawMessage
+    });
+    expect((caughtError as Error).message).not.toBe(rawMessage);
+  });
+
   it("rejects malformed email sign-in accounts before calling CloudBase", async () => {
     const client = fakeAuthClient();
     const service = createAuthService(client);
 
-    await expect(service.signIn({ account: "weihao@", password: "abc12345" })).rejects.toThrow(
-      "Enter a valid email address."
-    );
+    await expect(service.signIn({ account: "weihao@", password: "abc12345" })).rejects.toMatchObject({
+      code: "invalid-email"
+    });
     expect(client.signInWithPassword).not.toHaveBeenCalled();
   });
 
@@ -189,9 +214,9 @@ describe("createAuthService", () => {
     const client = fakeAuthClient();
     const service = createAuthService(client);
 
-    await expect(service.signIn({ account: "123456", password: "abc12345" })).rejects.toThrow(
-      "Username cannot be all numbers."
-    );
+    await expect(service.signIn({ account: "123456", password: "abc12345" })).rejects.toMatchObject({
+      code: "invalid-username"
+    });
     expect(client.signInWithPassword).not.toHaveBeenCalled();
   });
 

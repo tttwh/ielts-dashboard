@@ -1,6 +1,6 @@
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderWithI18n } from "../../test/renderWithI18n";
 import { AuthPanel, type AuthPanelProps } from "./AuthPanel";
 
@@ -24,6 +24,10 @@ const renderAuthPanel = (overrides: Partial<AuthPanelProps> = {}) => {
 };
 
 describe("AuthPanel", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
   it("renders sign-in fields and switches to sign-up fields", async () => {
     const { user } = renderAuthPanel();
 
@@ -69,6 +73,25 @@ describe("AuthPanel", () => {
       account: "weihao_02",
       password: "Password123"
     });
+  });
+
+  it("shows localized Chinese auth failure copy instead of a raw service message", async () => {
+    localStorage.setItem("ielts-dashboard-language", "zh");
+    const rawMessage = "Invalid login credentials.";
+    const { user } = renderAuthPanel({
+      onSignIn: vi.fn().mockRejectedValue(new Error(rawMessage))
+    });
+
+    await user.type(screen.getByLabelText("账号"), "weihao_02");
+    await user.type(screen.getByLabelText("密码"), "Password123");
+    await user.click(
+      within(screen.getByRole("form", { name: "登录" })).getByRole("button", {
+        name: "登录"
+      })
+    );
+
+    expect(await screen.findByText("认证失败。")).toBeVisible();
+    expect(screen.queryByText(rawMessage)).not.toBeInTheDocument();
   });
 
   it("rejects invalid sign-up fields before requesting a code", async () => {

@@ -127,8 +127,8 @@ All user-owned tables use `user_id varchar(64) not null default auth.uid()`. Clo
 
 ### daily_records
 
-- `record_id uuid primary key`
-- `user_id varchar(64) not null references auth.users(id)`
+- `record_id text not null`
+- `user_id varchar(64) not null default auth.uid() references auth.users(id)`
 - `record_date date not null`
 - `words_memorized integer not null`
 - `speaking_topics integer not null`
@@ -142,13 +142,14 @@ All user-owned tables use `user_id varchar(64) not null default auth.uid()`. Clo
 - `created_at timestamptz not null default now()`
 - `updated_at timestamptz not null default now()`
 - `deleted_at timestamptz`
+- `primary key (user_id, record_id)`
 
 Add a unique index on `(user_id, record_date)` for active records.
 
 ### timer_sessions
 
-- `session_id uuid primary key`
-- `user_id varchar(64) not null references auth.users(id)`
+- `session_id text primary key`
+- `user_id varchar(64) not null default auth.uid() references auth.users(id)`
 - `record_date date not null`
 - `section text not null`
 - `source text not null`

@@ -39,15 +39,36 @@ describe("verify-cloudbase-sql", () => {
     expect(result.stderr).toContain("default auth.uid()");
   });
 
+  it("rejects globally scoped daily record primary keys", () => {
+    const sql = readFileSync(sourceSqlPath, "utf8")
+      .replace(/\brecord_id\s+text\s+not null\b/i, "record_id text primary key")
+      .replace(/,\s*primary key\s*\(\s*user_id\s*,\s*record_id\s*\)/i, "");
+    const result = runVerifierWithSql(sql);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("daily_records primary key (user_id, record_id)");
+  });
+
   it("rejects uuid daily record ids because app record ids are text", () => {
     const sql = readFileSync(sourceSqlPath, "utf8").replace(
-      /\brecord_id\s+text\s+primary key\b/i,
+      /\brecord_id\s+text\s+(?:not null|primary key)\b/i,
       "record_id uuid primary key default gen_random_uuid()"
+    ).replace(/,\s*primary key\s*\(\s*user_id\s*,\s*record_id\s*\)/i, "");
+    const result = runVerifierWithSql(sql);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("daily_records record_id text not null");
+  });
+
+  it("rejects uuid timer session ids because fallback session ids are text", () => {
+    const sql = readFileSync(sourceSqlPath, "utf8").replace(
+      /\bsession_id\s+text\s+primary key\b/i,
+      "session_id uuid primary key default gen_random_uuid()"
     );
     const result = runVerifierWithSql(sql);
 
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain("daily_records record_id text primary key");
+    expect(result.stderr).toContain("timer_sessions session_id text primary key");
   });
 
   it("rejects profile policies without an authenticated status update guard", () => {

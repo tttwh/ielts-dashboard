@@ -11,6 +11,7 @@ import type {
   PasswordSignInCredentials
 } from "../../services/cloudbase/authService";
 import {
+  authErrorCodeFrom,
   validateEmail,
   validatePassword,
   validateUsername
@@ -95,6 +96,7 @@ export function AuthPanel({
   const [verificationCode, setVerificationCode] = useState("");
   const isBusy = status === "loading" || isSubmitting;
   const visibleError = formError ?? errorMessage;
+  const authErrorMessageFrom = (error: unknown) => t.auth.errors[authErrorCodeFrom(error)];
 
   useEffect(() => {
     if (pendingSignUpEmail) {
@@ -130,7 +132,7 @@ export function AuthPanel({
         password: signInPassword
       });
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : String(error));
+      setFormError(authErrorMessageFrom(error));
     } finally {
       setIsSubmitting(false);
     }
@@ -169,7 +171,7 @@ export function AuthPanel({
     try {
       await onStartEmailSignUp(credentials);
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : String(error));
+      setFormError(authErrorMessageFrom(error));
     } finally {
       setIsSubmitting(false);
     }
@@ -189,7 +191,7 @@ export function AuthPanel({
     try {
       await onCompleteEmailSignUp(trimmedCode);
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : String(error));
+      setFormError(authErrorMessageFrom(error));
     } finally {
       setIsSubmitting(false);
     }
@@ -201,7 +203,7 @@ export function AuthPanel({
     try {
       await onSignOut();
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : String(error));
+      setFormError(authErrorMessageFrom(error));
     } finally {
       setIsSubmitting(false);
     }

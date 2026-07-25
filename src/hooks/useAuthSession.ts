@@ -1,18 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
+  AuthErrorCode,
   AuthService,
   EmailSignUpChallenge,
   EmailSignUpCredentials,
   PasswordSignInCredentials
 } from "../services/cloudbase/authService";
-import { createAuthService } from "../services/cloudbase/authService";
+import { AuthError, authErrorCodeFrom, createAuthService } from "../services/cloudbase/authService";
 import { createCloudBaseClient } from "../services/cloudbase/cloudbaseClient";
 import type { CloudBaseAuthUser } from "../services/cloudbase/cloudbaseTypes";
 
 export interface AuthSession {
   status: "loading" | "guest" | "authenticated" | "error";
   user: CloudBaseAuthUser | null;
-  errorMessage: string | null;
+  errorCode: AuthErrorCode | null;
   pendingSignUp: EmailSignUpChallenge | null;
   startEmailSignUp(credentials: EmailSignUpCredentials): Promise<void>;
   completeEmailSignUp(verificationCode: string): Promise<void>;
@@ -22,17 +23,10 @@ export interface AuthSession {
 
 const defaultAuthService = () => createAuthService(createCloudBaseClient().auth);
 
-const errorMessageFrom = (error: unknown) => {
-  if (error instanceof Error && error.message.trim()) {
-    return error.message;
-  }
-  return "Authentication failed.";
-};
-
 export function useAuthSession(authService?: AuthService): AuthSession {
   const [status, setStatus] = useState<AuthSession["status"]>("loading");
   const [user, setUser] = useState<CloudBaseAuthUser | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<AuthErrorCode | null>(null);
   const [pendingSignUp, setPendingSignUp] = useState<EmailSignUpChallenge | null>(null);
   const defaultAuthServiceRef = useRef<AuthService | null>(null);
 
@@ -50,12 +44,12 @@ export function useAuthSession(authService?: AuthService): AuthSession {
 
   const setAuthenticatedUser = useCallback((nextUser: CloudBaseAuthUser | null) => {
     setUser(nextUser);
-    setErrorMessage(null);
+    setErrorCode(null);
     setStatus(nextUser ? "authenticated" : "guest");
   }, []);
 
   const setAuthError = useCallback((error: unknown) => {
-    setErrorMessage(errorMessageFrom(error));
+    setErrorCode(authErrorCodeFrom(error));
     setStatus("error");
   }, []);
 
@@ -64,7 +58,7 @@ export function useAuthSession(authService?: AuthService): AuthSession {
     let unsubscribe: (() => void) | null = null;
 
     setStatus("loading");
-    setErrorMessage(null);
+    setErrorCode(null);
 
     try {
       const service = resolveAuthService();
@@ -99,7 +93,7 @@ export function useAuthSession(authService?: AuthService): AuthSession {
   const startEmailSignUp = useCallback(
     async (credentials: EmailSignUpCredentials) => {
       try {
-        setErrorMessage(null);
+        setErrorCode(null);
         const challenge = await resolveAuthService().startEmailSignUp(credentials);
         setPendingSignUp(challenge);
         setStatus((currentStatus) =>
@@ -115,12 +109,12 @@ export function useAuthSession(authService?: AuthService): AuthSession {
   const completeEmailSignUp = useCallback(
     async (verificationCode: string) => {
       if (!pendingSignUp) {
-        setAuthError(new Error("Start email sign up before completing verification."));
+        setAuthError(new AuthError("missing-sign-up-challenge"));
         return;
       }
 
       try {
-        setErrorMessage(null);
+        setErrorCode(null);
         const nextUser = await resolveAuthService().completeEmailSignUp(
           pendingSignUp,
           verificationCode
@@ -137,7 +131,7 @@ export function useAuthSession(authService?: AuthService): AuthSession {
   const signIn = useCallback(
     async (credentials: PasswordSignInCredentials) => {
       try {
-        setErrorMessage(null);
+        setErrorCode(null);
         const nextUser = await resolveAuthService().signIn(credentials);
         setPendingSignUp(null);
         setAuthenticatedUser(nextUser);
@@ -150,7 +144,7 @@ export function useAuthSession(authService?: AuthService): AuthSession {
 
   const signOut = useCallback(async () => {
     try {
-      setErrorMessage(null);
+      setErrorCode(null);
       await resolveAuthService().signOut();
       setPendingSignUp(null);
       setAuthenticatedUser(null);
@@ -163,7 +157,7 @@ export function useAuthSession(authService?: AuthService): AuthSession {
     () => ({
       status,
       user,
-      errorMessage,
+      errorCode,
       pendingSignUp,
       startEmailSignUp,
       completeEmailSignUp,
@@ -172,7 +166,7 @@ export function useAuthSession(authService?: AuthService): AuthSession {
     }),
     [
       completeEmailSignUp,
-      errorMessage,
+      errorCode,
       pendingSignUp,
       signIn,
       signOut,

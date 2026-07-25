@@ -181,7 +181,7 @@ import App from "./App";
 function arrangeAuthSession(overrides: Record<string, unknown> = {}) {
   const session = {
     completeEmailSignUp: vi.fn(),
-    errorMessage: null,
+    errorCode: null,
     pendingSignUp: null,
     signIn: vi.fn(),
     signOut: vi.fn(),
@@ -249,6 +249,7 @@ function arrangeDashboardData(overrides: Record<string, unknown> = {}) {
 describe("App composition", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
     mocks.fakeCloudBaseClient.rdb.mockReturnValue(mocks.fakeRdb);
     mocks.createAuthService.mockReturnValue(mocks.fakeAuthService);
     mocks.createCloudBaseClient.mockReturnValue(mocks.fakeCloudBaseClient);
@@ -313,6 +314,24 @@ describe("App composition", () => {
       })
     );
     expect(mocks.checkInPageProps).not.toHaveBeenCalled();
+  });
+
+  it("maps auth error codes to localized auth panel messages", () => {
+    localStorage.setItem("ielts-dashboard-language", "zh");
+    arrangeDashboardData();
+    arrangeAuthSession({
+      errorCode: "authentication-failed",
+      status: "error"
+    });
+
+    render(<App />);
+
+    expect(mocks.authPanelProps).toHaveBeenCalledWith(
+      expect.objectContaining({
+        errorMessage: "认证失败。",
+        status: "error"
+      })
+    );
   });
 
   it("creates CloudBase services when config exists and syncs authenticated users", async () => {

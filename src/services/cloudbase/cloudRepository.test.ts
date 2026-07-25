@@ -153,6 +153,79 @@ const createFakeRdb = ({
   return { calls, rdb, upserts };
 };
 
+const keyColumnsFor = (options?: { onConflict?: string }) =>
+  options?.onConflict?.split(",").map((key) => key.trim()).filter(Boolean) ?? ["id"];
+
+const createPersistingFakeRdb = () => {
+  const tableRows: Record<string, Array<Record<string, unknown>>> = {};
+  const upserts: UpsertCall[] = [];
+
+  const rdb: CloudBaseRdbClient = {
+    from: <T>(tableName: string) => ({
+      select: () => ({
+        eq: async (): Promise<CloudBaseRdbResult<T>> => ({
+          data: (tableRows[tableName] ?? []) as T[],
+          error: null
+        })
+      }),
+      upsert: async (values: T | T[], options?: { onConflict?: string }): Promise<CloudBaseRdbResult<T>> => {
+        const incomingRows = (Array.isArray(values) ? values : [values]) as Array<Record<string, unknown>>;
+        const targetRows = tableRows[tableName] ?? [];
+        const keyColumns = keyColumnsFor(options);
+
+        upserts.push({
+          tableName,
+          values,
+          onConflict: options?.onConflict
+        });
+
+        for (const row of incomingRows) {
+          const existingIndex = targetRows.findIndex((existing) =>
+            keyColumns.every((column) => existing[column] === row[column])
+          );
+          if (existingIndex >= 0) {
+            targetRows[existingIndex] = { ...targetRows[existingIndex], ...row };
+          } else {
+            targetRows.push({ ...row });
+          }
+        }
+
+        tableRows[tableName] = targetRows;
+
+        return {
+          data: [],
+          error: null
+        };
+      }
+    })
+  };
+
+  return { rdb, tableRows, upserts };
+};
+
+const createStateForUser = (userId: string): AppState => {
+  const state = createFilledState();
+
+  return {
+    ...state,
+    profile: {
+      ...state.profile,
+      userId
+    },
+    dailyGoals: {
+      ...state.dailyGoals,
+      userId
+    },
+    records: state.records.map((record) => ({
+      ...record,
+      recordId: "record-2026-07-24",
+      userId
+    })),
+    timerSessions: [],
+    achievements: []
+  };
+};
+
 const createCloudSelectData = (state = createFilledState()): FakeTableData => {
   const rows = appStateToCloudRows(state, "weihao_01");
 
@@ -289,7 +362,7 @@ describe("createCloudRepository", () => {
       {
         tableName: "daily_records",
         values: rows.records,
-        onConflict: "record_id"
+        onConflict: "user_id,record_id"
       },
       {
         tableName: "timer_sessions",
@@ -301,6 +374,28 @@ describe("createCloudRepository", () => {
         values: rows.achievements,
         onConflict: "user_id,achievement_id"
       }
+    ]);
+  });
+
+  it("keeps identical daily record ids isolated between different users", async () => {
+    const { rdb, tableRows, upserts } = createPersistingFakeRdb();
+    const repository = createCloudRepository(rdb);
+
+    await repository.saveCloudState(createStateForUser("cloud-user-1"), "weihao_01");
+    await repository.saveCloudState(createStateForUser("cloud-user-2"), "weihao_02");
+
+    const dailyRecordUpserts = upserts.filter((upsert) => upsert.tableName === "daily_records");
+    expect(dailyRecordUpserts).toHaveLength(2);
+    expect(dailyRecordUpserts.every((upsert) => upsert.onConflict === "user_id,record_id")).toBe(true);
+    expect(tableRows.daily_records).toEqual([
+      expect.objectContaining({
+        record_id: "record-2026-07-24",
+        user_id: "cloud-user-1"
+      }),
+      expect.objectContaining({
+        record_id: "record-2026-07-24",
+        user_id: "cloud-user-2"
+      })
     ]);
   });
 

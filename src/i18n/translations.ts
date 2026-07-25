@@ -1,4 +1,5 @@
 import type { Achievement, IeltsSection } from "../domain/types";
+import type { AuthErrorCode } from "../services/cloudbase/authService";
 import type { SyncErrorCode } from "../services/sync/syncTypes";
 
 export type Language = "en" | "zh";
@@ -56,6 +57,7 @@ export interface I18nText {
     loading: string;
     cloudUnavailable: string;
     signedInAs(accountName: string): string;
+    errors: Record<AuthErrorCode, string>;
     validation: {
       accountHelp: string;
       emailHelp: string;
@@ -301,6 +303,16 @@ export const translations: Record<Language, I18nText> = {
       loading: "Loading account",
       cloudUnavailable: "CloudBase is not configured for this build.",
       signedInAs: (accountName) => `Signed in as ${accountName}`,
+      errors: {
+        "authentication-failed": "Authentication failed.",
+        "cloud-unavailable": "CloudBase is not configured for this build.",
+        "invalid-email": "Enter a valid email address.",
+        "invalid-password": "Password must be 8-32 characters and include letters and numbers.",
+        "invalid-username": "Use a valid username.",
+        "invalid-verification-code": "Enter the 6-digit verification code.",
+        "missing-sign-up-challenge": "Start email sign up before completing verification.",
+        "verification-unavailable": "Email verification is unavailable. Try again later."
+      },
       validation: {
         accountHelp: "Use a valid email or a 5-24 character username.",
         emailHelp: "Enter a valid email address.",
@@ -485,6 +497,16 @@ export const translations: Record<Language, I18nText> = {
       loading: "正在读取账号",
       cloudUnavailable: "当前构建未配置 CloudBase。",
       signedInAs: (accountName) => `已登录：${accountName}`,
+      errors: {
+        "authentication-failed": "认证失败。",
+        "cloud-unavailable": "当前构建未配置 CloudBase。",
+        "invalid-email": "请输入有效邮箱地址。",
+        "invalid-password": "密码需为 8-32 位，并同时包含字母和数字。",
+        "invalid-username": "请输入有效用户名。",
+        "invalid-verification-code": "请输入 6 位数字验证码。",
+        "missing-sign-up-challenge": "请先发送验证码，再完成注册。",
+        "verification-unavailable": "验证码服务暂不可用，请稍后再试。"
+      },
       validation: {
         accountHelp: "请输入有效邮箱，或 5-24 位用户名。",
         emailHelp: "请输入有效邮箱地址。",

@@ -651,8 +651,8 @@ create table if not exists public.goals (
 );
 
 create table if not exists public.daily_records (
-  record_id uuid primary key default gen_random_uuid(),
-  user_id varchar(64) not null references auth.users(id),
+  record_id text not null,
+  user_id varchar(64) not null default auth.uid() references auth.users(id),
   record_date date not null,
   words_memorized integer not null,
   speaking_topics integer not null,
@@ -665,12 +665,13 @@ create table if not exists public.daily_records (
   xp_earned integer not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  deleted_at timestamptz
+  deleted_at timestamptz,
+  primary key (user_id, record_id)
 );
 
 create table if not exists public.timer_sessions (
-  session_id uuid primary key default gen_random_uuid(),
-  user_id varchar(64) not null references auth.users(id),
+  session_id text primary key,
+  user_id varchar(64) not null default auth.uid() references auth.users(id),
   record_date date not null,
   section text not null check (section in ('listening', 'speaking', 'reading', 'writing')),
   source text not null check (source in ('in-app-timer', 'manual-external')),

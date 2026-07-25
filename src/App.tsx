@@ -17,7 +17,7 @@ import { ProgressPage } from "./pages/ProgressPage";
 import { RewardsPage } from "./pages/RewardsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { TimerPage } from "./pages/TimerPage";
-import { createAuthService, type AuthService } from "./services/cloudbase/authService";
+import { AuthError, createAuthService, type AuthService } from "./services/cloudbase/authService";
 import {
   createCloudBaseClient,
   readCloudBaseConfig
@@ -39,21 +39,21 @@ interface CloudRuntime {
   syncManager: SyncManager;
 }
 
-const createGuestAuthService = (unavailableMessage: string): AuthService => ({
+const createGuestAuthService = (): AuthService => ({
   async getCurrentUser() {
     return null;
   },
 
   async startEmailSignUp() {
-    throw new Error(unavailableMessage);
+    throw new AuthError("cloud-unavailable");
   },
 
   async completeEmailSignUp() {
-    throw new Error(unavailableMessage);
+    throw new AuthError("cloud-unavailable");
   },
 
   async signIn() {
-    throw new Error(unavailableMessage);
+    throw new AuthError("cloud-unavailable");
   },
 
   async signOut() {
@@ -151,10 +151,7 @@ function SyncStatusBadge({
 function DashboardApp() {
   const { t } = useI18n();
   const cloudRuntime = useMemo(() => createCloudRuntime(), []);
-  const guestAuthService = useMemo(
-    () => createGuestAuthService(t.auth.cloudUnavailable),
-    [t.auth.cloudUnavailable]
-  );
+  const guestAuthService = useMemo(() => createGuestAuthService(), []);
   const repository = useMemo(() => createLocalStorageRepository(), []);
   const [activeView, setActiveView] = useState<DashboardView>(() =>
     viewFromHash(globalThis.location?.hash ?? "")
@@ -179,6 +176,7 @@ function DashboardApp() {
   const xp = activeRecordXp(state.records);
   const level = calculateLevel(xp);
   const accountName = accountNameForUser(authSession.user);
+  const authErrorMessage = authSession.errorCode ? t.auth.errors[authSession.errorCode] : null;
 
   useEffect(() => {
     const handleLocationChange = () => {
@@ -229,7 +227,7 @@ function DashboardApp() {
       authSlot={
         <AuthPanel
           accountName={accountName}
-          errorMessage={authSession.errorMessage}
+          errorMessage={authErrorMessage}
           onCompleteEmailSignUp={authSession.completeEmailSignUp}
           onSignIn={authSession.signIn}
           onSignOut={authSession.signOut}

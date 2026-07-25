@@ -85,6 +85,7 @@ if (/\buser_id\s+uuid\b/i.test(sql)) {
 const profilesTable = getCreateTableBody("profiles");
 const goalsTable = getCreateTableBody("goals");
 const dailyRecordsTable = getCreateTableBody("daily_records");
+const timerSessionsTable = getCreateTableBody("timer_sessions");
 
 if (!/\buser_id\s+varchar\(64\)[^\n,]*\bprimary key\b[^\n,]*\breferences auth\.users\(id\)/i.test(goalsTable)) {
   missing.push("goals user_id primary key");
@@ -98,12 +99,27 @@ if (/goals_one_active_per_user_idx/i.test(sql)) {
   missing.push("stale goals partial user index");
 }
 
-if (!/\brecord_id\s+text\s+primary key\b/i.test(dailyRecordsTable)) {
-  missing.push("daily_records record_id text primary key");
+if (!/\brecord_id\s+text\s+not null\b/i.test(dailyRecordsTable)) {
+  missing.push("daily_records record_id text not null");
+}
+
+if (
+  /\brecord_id\s+text\s+primary key\b/i.test(dailyRecordsTable) ||
+  !/\bprimary key\s*\(\s*user_id\s*,\s*record_id\s*\)/i.test(dailyRecordsTable)
+) {
+  missing.push("daily_records primary key (user_id, record_id)");
 }
 
 if (/\brecord_id\s+uuid\b/i.test(dailyRecordsTable)) {
   missing.push("stale daily_records uuid record_id column");
+}
+
+if (!/\bsession_id\s+text\s+primary key\b/i.test(timerSessionsTable)) {
+  missing.push("timer_sessions session_id text primary key");
+}
+
+if (/\bsession_id\s+uuid\b/i.test(timerSessionsTable)) {
+  missing.push("stale timer_sessions uuid session_id column");
 }
 
 if (!/\bstatus\s+text\s+not null\s+default 'active'\s+check\s*\(status in \('active', 'disabled', 'pending'\)\)/i.test(profilesTable)) {

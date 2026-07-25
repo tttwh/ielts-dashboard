@@ -75,7 +75,7 @@ describe("useAuthSession", () => {
     expect(result.current).toMatchObject({
       status: "loading",
       user: null,
-      errorMessage: null,
+      errorCode: null,
       pendingSignUp: null
     });
   });
@@ -87,7 +87,7 @@ describe("useAuthSession", () => {
 
     await waitFor(() => expect(result.current.status).toBe("guest"));
     expect(result.current.user).toBeNull();
-    expect(result.current.errorMessage).toBeNull();
+    expect(result.current.errorCode).toBeNull();
     expect(service.onAuthStateChanged).toHaveBeenCalledOnce();
   });
 
@@ -98,7 +98,7 @@ describe("useAuthSession", () => {
 
     await waitFor(() => expect(result.current.status).toBe("authenticated"));
     expect(result.current.user).toEqual(cloudUser);
-    expect(result.current.errorMessage).toBeNull();
+    expect(result.current.errorCode).toBeNull();
   });
 
   it("updates state when auth state changes outside hook actions", async () => {
@@ -169,20 +169,26 @@ describe("useAuthSession", () => {
     expect(result.current.user).toBeNull();
   });
 
-  it("surfaces service errors as errorMessage", async () => {
+  it("stores service failures as auth error codes without surfacing raw messages", async () => {
     const { service } = createAuthService(null);
-    vi.mocked(service.getCurrentUser).mockRejectedValue(new Error("session failed"));
+    vi.mocked(service.getCurrentUser).mockRejectedValue(new Error("Invalid login credentials."));
 
     const { result } = renderHook(() => useAuthSession(service));
 
     await waitFor(() => expect(result.current.status).toBe("error"));
-    expect(result.current.errorMessage).toBe("session failed");
+    expect(result.current.errorCode).toBe("authentication-failed");
+    expect((result.current as unknown as Record<string, unknown>).errorMessage).not.toBe(
+      "Invalid login credentials."
+    );
   });
 
   it("turns default service creation errors into hook state", async () => {
     const { result } = renderHook(() => useAuthSession());
 
     await waitFor(() => expect(result.current.status).toBe("error"));
-    expect(result.current.errorMessage).toBe("VITE_CLOUDBASE_ENV_ID is required");
+    expect(result.current.errorCode).toBe("authentication-failed");
+    expect((result.current as unknown as Record<string, unknown>).errorMessage).not.toBe(
+      "VITE_CLOUDBASE_ENV_ID is required"
+    );
   });
 });
