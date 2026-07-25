@@ -27,3 +27,4 @@ Task 6: complete (commits d463d28..a1f5fd2, review clean; minor fixed after appr
 Task 7: complete (commits 49fa005..3937026, review clean; minor: auth listener unsubscription test could be added)
 Task 8: complete (commits 21250bf..d9940a4, review clean; minor: CloudBase SDK chunk size warning remains)
 Task 9: complete (commits 6114270..e72f2c1, review clean; pending external: real CloudBase PG two-account/RLS manual validation requires a configured CloudBase environment)
+Final whole-branch review fixes: complete (commits 798397c..57a2bce, final review clean; pending external: real CloudBase PG two-account/RLS manual validation requires a configured CloudBase environment)
