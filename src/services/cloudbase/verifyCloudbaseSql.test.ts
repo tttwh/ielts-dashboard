@@ -81,4 +81,15 @@ describe("verify-cloudbase-sql", () => {
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("profile status update guard");
   });
+
+  it("rejects schemas without authenticated table grants", () => {
+    const sql = readFileSync(sourceSqlPath, "utf8").replace(
+      /grant select, insert, update on public\.profiles to authenticated;/i,
+      ""
+    );
+    const result = runVerifierWithSql(sql);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("profiles authenticated table grant");
+  });
 });

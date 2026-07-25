@@ -99,6 +99,7 @@ Use two throwaway accounts. Do not use your real personal password.
 | A refresh | Refresh after A syncs | A data restores |
 | A second session | Log into A in another browser profile | A cloud data loads |
 | B isolation | Register and log into B | B cannot see A goals, daily records, timer sessions, or achievements |
+| Anonymous block | Run an unauthenticated read/write check | `anon` has no table-level access to app tables |
 | RLS insert block | Try to insert/update a row with B auth but A `user_id` | CloudBase PG rejects it |
 | Offline safety | Disable network during an edit | Local data stays visible and sync status shows offline/error |
 | Logout safety | Sign out | App returns to guest mode without deleting A or guest cache |
@@ -146,7 +147,9 @@ Expected:
 - user-owned `user_id` columns use `varchar(64)` and default to `auth.uid()` where inserts need it.
 - `daily_records` uses primary key `(user_id, record_id)`.
 - `timer_sessions.session_id` is `text`.
-- RLS is enabled on every app table.
+- `anon` has no table-level access to app tables.
+- `authenticated` has only `select`, `insert`, and `update` table-level access to app tables.
+- RLS is enabled on every app table and still filters every row by `auth.uid()`.
 
 ## 8. Current Known Gaps
 

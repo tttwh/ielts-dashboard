@@ -57,6 +57,12 @@ for (const table of tables) {
   if (!sql.includes(`alter table public.${table} enable row level security`)) {
     missing.push(`${table} RLS enable`);
   }
+  if (!sql.includes(`revoke all on public.${table} from anon`)) {
+    missing.push(`${table} anon revoke`);
+  }
+  if (!sql.includes(`grant select, insert, update on public.${table} to authenticated`)) {
+    missing.push(`${table} authenticated table grant`);
+  }
   if (!sql.includes(`${table}_select_own`)) missing.push(`${table} select policy`);
   if (!sql.includes(`${table}_insert_own`)) missing.push(`${table} insert policy`);
   if (!sql.includes(`${table}_update_own`)) missing.push(`${table} update policy`);

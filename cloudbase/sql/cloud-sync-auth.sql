@@ -85,6 +85,18 @@ alter table public.daily_records enable row level security;
 alter table public.timer_sessions enable row level security;
 alter table public.achievements enable row level security;
 
+revoke all on public.profiles from anon;
+revoke all on public.goals from anon;
+revoke all on public.daily_records from anon;
+revoke all on public.timer_sessions from anon;
+revoke all on public.achievements from anon;
+
+grant select, insert, update on public.profiles to authenticated;
+grant select, insert, update on public.goals to authenticated;
+grant select, insert, update on public.daily_records to authenticated;
+grant select, insert, update on public.timer_sessions to authenticated;
+grant select, insert, update on public.achievements to authenticated;
+
 create or replace function public.prevent_profile_status_update_by_authenticated()
 returns trigger
 language plpgsql

@@ -93,7 +93,7 @@ CloudBase 必须使用 PG mode，不使用传统文档数据库模式。控制�
 4. 为 Web SDK 生成 Publishable Key。
 5. 把本地开发地址和部署地址加入安全来源，例如 `http://127.0.0.1:5173`。
 6. 区域默认使用 `ap-shanghai`，除非实际环境另有要求。
-7. 在 CloudBase PG SQL 控制台执行 `cloudbase/sql/cloud-sync-auth.sql`，创建表、索引和 RLS 策略。
+7. 在 CloudBase PG SQL 控制台执行 `cloudbase/sql/cloud-sync-auth.sql`，创建表、索引、表级授权和 RLS 策略。
 
 如果你之前在 CloudBase 里执行过旧版 SQL，先按 `docs/cloudbase-go-live-checklist.md` 里的顺序运行迁移文件：
 
@@ -175,7 +175,7 @@ CloudBase Web SDK 的 publishable access key 也只应作为环境配置使用�
 5. 刷新页面，确认账号 A 的云端数据恢复。
 6. 第二个浏览器会话登录账号 A，确认能读取同一份云端数据。
 7. 账号 B 注册并登录，确认不能读取账号 A 的目标、记录、计时和成就。
-8. 在 SQL/RLS 验证中确认账号 B 不能插入或更新 `user_id` 为账号 A 的行。
+8. 在 SQL 权限/RLS 验证中确认 `anon` 无表级读写权限，账号 B 不能插入或更新 `user_id` 为账号 A 的行。
 9. 模拟断网或 CloudBase 请求失败，确认本地修改保留，并显示离线或同步错误状态。
 10. 退出登录，确认回到访客/本地模式，本地数据没有被删除。
 
@@ -220,14 +220,14 @@ src/
   services/cloudbase/  CloudBase Web SDK、Auth、PG repository 和 mapper
   services/storage/    本地存储与仓储接口
   services/sync/       本地优先同步、导入和合并逻辑
-cloudbase/sql/         CloudBase PG schema 和 RLS SQL
+cloudbase/sql/         CloudBase PG schema、表级授权和 RLS SQL
 tests/e2e/             Playwright 端到端测试
 docs/                  需求、设计和实现计划文档
 ```
 
 ## 当前状态
 
-已完成本地优先看板、CloudBase PG 认证边界、云端 repository、同步管理器、RLS SQL、单元测试和桌面/移动端 E2E 检查。真实 CloudBase 人工验证需要单独准备 PG 环境和两个一次性测试账号后执行。
+已完成本地优先看板、CloudBase PG 认证边界、云端 repository、同步管理器、表级授权/RLS SQL、单元测试和桌面/移动端 E2E 检查。真实 CloudBase 人工验证需要单独准备 PG 环境和两个一次性测试账号后执行。
 
 ## 后续路线图
 
