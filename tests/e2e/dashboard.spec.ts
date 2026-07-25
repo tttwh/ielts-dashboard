@@ -36,10 +36,23 @@ async function openView(page: Page, label: string) {
 }
 
 async function expectNoHorizontalBodyOverflow(page: Page) {
-  const hasOverflow = await page.evaluate(
-    () => document.documentElement.scrollWidth > document.documentElement.clientWidth
-  );
-  expect(hasOverflow).toBe(false);
+  const metrics = await page.evaluate(() => ({
+    bodyScrollWidth: document.body.scrollWidth,
+    clientWidth: document.documentElement.clientWidth,
+    documentScrollWidth: document.documentElement.scrollWidth
+  }));
+
+  expect(metrics.documentScrollWidth).toBeLessThanOrEqual(metrics.clientWidth);
+  expect(metrics.bodyScrollWidth).toBeLessThanOrEqual(metrics.clientWidth);
+}
+
+async function expectElementInsideViewport(page: Page, testId: string) {
+  const fitsViewport = await page.getByTestId(testId).evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    return box.left >= 0 && box.right <= window.innerWidth;
+  });
+
+  expect(fitsViewport).toBeTruthy();
 }
 
 test("dashboard loads into overview with six-page navigation", async ({ page }) => {
@@ -146,9 +159,88 @@ test("manual external time updates section minutes across pages", async ({ page 
   await expect(page.getByTestId("checkin-study-time-status")).toContainText("Writing 15/45 min");
 });
 
-test("viewport has no horizontal body overflow", async ({ page }) => {
+test("viewport has no horizontal body overflow at configured desktop and mobile sizes", async ({
+  page
+}, testInfo) => {
   await loadDashboard(page);
 
+  const expectedViewport =
+    testInfo.project.name === "chromium-mobile"
+      ? { width: 390, height: 844 }
+      : { width: 1440, height: 900 };
+
+  expect(page.viewportSize()).toEqual(expectedViewport);
+  await expectNoHorizontalBodyOverflow(page);
+});
+
+test("auth panel opens and validates credentials without real CloudBase credentials", async ({
+  page
+}, testInfo) => {
+  await loadDashboard(page);
+
+  expect(["chromium-desktop", "chromium-mobile"]).toContain(testInfo.project.name);
+
+  const panel = page.getByTestId("auth-panel");
+  await expect(panel).toBeVisible();
+  await expect(panel.getByText("Guest")).toBeVisible();
+  await expectElementInsideViewport(page, "auth-panel");
+
+  const signInForm = panel.getByRole("form", { name: "Sign in" });
+  await signInForm.getByLabel("Account").fill("bad@");
+  await signInForm.getByLabel("Password").fill("short");
+  await signInForm.getByRole("button", { name: "Sign in" }).click();
+
+  await expect(
+    panel.getByText("Use a valid email or a 5-24 character username.")
+  ).toBeVisible();
+  await expect(
+    panel.getByText("Password must be 8-32 characters and include letters and numbers.")
+  ).toBeVisible();
+
+  await panel.getByRole("button", { name: "Sign up" }).click();
+
+  const signUpForm = panel.getByRole("form", { name: "Sign up" });
+  await signUpForm.getByLabel("Email").fill("bad-email");
+  await signUpForm.getByLabel("Username").fill("123456");
+  await signUpForm.getByLabel("Password").fill("short1");
+  await signUpForm.getByRole("button", { name: "Send verification code" }).click();
+
+  await expect(panel.getByText("Enter a valid email address.")).toBeVisible();
+  await expect(
+    panel.getByText(
+      "Username must be 5-24 characters and may use letters, numbers, underscores, or hyphens."
+    )
+  ).toBeVisible();
+  await expect(
+    panel.getByText("Password must be 8-32 characters and include letters and numbers.")
+  ).toBeVisible();
+
+  await signUpForm.getByLabel("Email").fill("e2e@example.invalid");
+  await signUpForm.getByLabel("Username").fill("weihao_e2e");
+  await signUpForm.getByLabel("Password").fill("abc12345");
+  await signUpForm.getByRole("button", { name: "Send verification code" }).click();
+
+  const completeSignUpForm = panel.getByRole("form", { name: "Complete sign up" });
+  await expect(panel.getByText("e2e@example.invalid")).toBeVisible();
+  await completeSignUpForm.getByLabel("Verification code").fill("12");
+  await completeSignUpForm.getByRole("button", { name: "Complete sign up" }).click();
+
+  await expect(panel.getByText("Enter the 6-digit verification code.")).toBeVisible();
+
+  await completeSignUpForm.getByLabel("Verification code").fill("123456");
+  await completeSignUpForm.getByRole("button", { name: "Complete sign up" }).click();
+
+  await expect(panel.getByText("Signed in as weihao_e2e")).toBeVisible();
+  const syncStatus = page.getByTestId("sync-status");
+  await expect(syncStatus.getByText("Synced")).toBeVisible();
+
+  await panel.getByRole("button", { name: "Sign out" }).click();
+
+  await expect(panel.getByText("Guest")).toBeVisible();
+  await expect(syncStatus).not.toContainText("Synced");
+  await expect(syncStatus).toContainText("Local guest");
+  await expect(page.getByText("Local mode · cloud-ready schema")).toBeVisible();
+  await expect(panel.getByRole("button", { name: "Sign in" })).toBeVisible();
   await expectNoHorizontalBodyOverflow(page);
 });
 

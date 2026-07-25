@@ -9,6 +9,20 @@ const user = {
   accountName: "weihao_01"
 };
 
+const sdkUserWithId = {
+  id: "cloud-user-id-1",
+  email: "weihao@example.com",
+  username: "weihao_01",
+  accountName: "weihao_01"
+};
+
+const normalizedSdkUserWithId = {
+  uid: "cloud-user-id-1",
+  email: "weihao@example.com",
+  username: "weihao_01",
+  accountName: "weihao_01"
+};
+
 const fakeAuthClient = (overrides: Partial<CloudBaseAuthClient> = {}): CloudBaseAuthClient => ({
   signUp: vi.fn(async () => ({
     data: {
@@ -60,6 +74,52 @@ describe("createAuthService", () => {
     const service = createAuthService(client);
 
     await expect(service.getCurrentUser()).resolves.toEqual(user);
+  });
+
+  it("normalizes CloudBase SDK user.id to the app uid field", async () => {
+    const verifyOtp = vi.fn(async () => ({
+      data: { user: sdkUserWithId, session: {} },
+      error: null
+    }));
+    const onAuthStateChange = vi.fn(
+      (listener: Parameters<CloudBaseAuthClient["onAuthStateChange"]>[0]) => {
+        listener("SIGNED_IN", { user: sdkUserWithId });
+        return () => undefined;
+      }
+    );
+    const client = fakeAuthClient({
+      getSession: vi.fn(async () => ({ data: { user: sdkUserWithId }, error: null })),
+      onAuthStateChange,
+      signInWithPassword: vi.fn(async () => ({
+        data: { user: sdkUserWithId, session: {} },
+        error: null
+      })),
+      signUp: vi.fn(async () => ({
+        data: {
+          messageId: "message-1",
+          verifyOtp
+        },
+        error: null
+      }))
+    });
+    const service = createAuthService(client);
+    const listener = vi.fn();
+
+    await expect(service.getCurrentUser()).resolves.toEqual(normalizedSdkUserWithId);
+    await expect(
+      service.signIn({ account: "weihao@example.com", password: "abc12345" })
+    ).resolves.toEqual(normalizedSdkUserWithId);
+    const challenge = await service.startEmailSignUp({
+      email: "weihao@example.com",
+      username: "weihao_01",
+      password: "abc12345"
+    });
+    await expect(service.completeEmailSignUp(challenge, "123456")).resolves.toEqual(
+      normalizedSdkUserWithId
+    );
+    service.onAuthStateChanged(listener);
+
+    expect(listener).toHaveBeenCalledWith(normalizedSdkUserWithId);
   });
 
   it("starts email verification registration", async () => {

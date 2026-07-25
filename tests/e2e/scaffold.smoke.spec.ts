@@ -14,17 +14,28 @@ async function openView(page: Page, label: string) {
 }
 
 async function expectNoHorizontalOverflow(page: Page) {
-  const hasNoHorizontalOverflow = await page.evaluate(() => {
-    const { scrollWidth, clientWidth } = document.documentElement;
-    return scrollWidth <= clientWidth;
-  });
+  const hasNoHorizontalOverflow = await page.evaluate(
+    () =>
+      document.documentElement.scrollWidth <= document.documentElement.clientWidth &&
+      document.body.scrollWidth <= document.documentElement.clientWidth
+  );
 
   expect(hasNoHorizontalOverflow).toBeTruthy();
 }
 
-test("dashboard shell loads without horizontal overflow", async ({ page }) => {
+function expectConfiguredViewport(page: Page, projectName: string) {
+  const expectedViewport =
+    projectName === "chromium-mobile"
+      ? { width: 390, height: 844 }
+      : { width: 1440, height: 900 };
+
+  expect(page.viewportSize()).toEqual(expectedViewport);
+}
+
+test("dashboard shell loads without horizontal overflow", async ({ page }, testInfo) => {
   await loadDashboard(page);
 
+  expectConfiguredViewport(page, testInfo.project.name);
   await expect(page.getByRole("heading", { name: "IELTS Prep Dashboard" })).toBeVisible();
   await expect(page.getByText("Local mode · cloud-ready schema")).toBeVisible();
   await expect(page.getByRole("progressbar", { name: "Today completion" })).toBeVisible();
@@ -41,6 +52,38 @@ test("dashboard shell loads without horizontal overflow", async ({ page }) => {
   });
 
   expect(summaryFitsViewport).toBeTruthy();
+});
+
+test("guest mode allows check-in, timer, settings, and language toggle", async ({
+  page
+}, testInfo) => {
+  await loadDashboard(page);
+
+  expectConfiguredViewport(page, testInfo.project.name);
+  await expect(page.getByTestId("auth-panel").getByText("Guest")).toBeVisible();
+
+  await openView(page, "Check-in");
+  const checkIn = page.getByTestId("daily-checkin");
+  await checkIn.getByLabel("Words actual").fill("100");
+  await expect(checkIn.getByLabel("Words complete")).toBeVisible();
+
+  await openView(page, "Timer");
+  const timerPanel = page.getByTestId("study-timer-panel");
+  await timerPanel.getByLabel("Manual section").selectOption("listening");
+  await timerPanel.getByLabel("Manual minutes").fill("15");
+  await timerPanel.getByRole("button", { name: /record external time/i }).click();
+
+  await openView(page, "Check-in");
+  await expect(page.getByTestId("checkin-study-time-status")).toContainText("Listening 15/45 min");
+
+  await openView(page, "Settings");
+  await expect(page.getByText("CloudBase mode")).toBeVisible();
+  await page.getByTestId("page-settings").getByRole("button", { name: "中" }).click();
+
+  await expect(page.getByRole("heading", { name: "雅思备考打卡看板" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "设置" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "打卡" })).toBeVisible();
+  await expectNoHorizontalOverflow(page);
 });
 
 test("history heatmap updates today and contains mobile scrolling inside the strip", async ({

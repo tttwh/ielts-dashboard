@@ -67,10 +67,7 @@ describe("createCloudBaseClient", () => {
     expect(cloudbaseInit).toHaveBeenCalledWith({
       env: "test-env",
       region: "ap-shanghai",
-      accessKey: "publishable-test-key",
-      auth: {
-        detectSessionInUrl: true
-      }
+      accessKey: "publishable-test-key"
     });
     expect(client).toBe(sdkClient);
   });

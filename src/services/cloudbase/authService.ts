@@ -1,4 +1,10 @@
-import type { CloudBaseAuthClient, CloudBaseAuthResponse, CloudBaseAuthResponseData, CloudBaseAuthUser } from "./cloudbaseTypes";
+import type {
+  CloudBaseAuthClient,
+  CloudBaseAuthResponse,
+  CloudBaseAuthResponseData,
+  CloudBaseAuthUser,
+  CloudBaseRawAuthUser
+} from "./cloudbaseTypes";
 
 export interface EmailSignUpCredentials {
   email: string;
@@ -67,17 +73,34 @@ const assertValidPassword = (password: string) => {
   if (passwordError) throw new Error(passwordError);
 };
 
-const requireUser = (user: CloudBaseAuthUser | null | undefined): CloudBaseAuthUser => {
-  if (!user?.uid) {
+const normalizeCloudBaseUser = (
+  user: CloudBaseRawAuthUser | null | undefined
+): CloudBaseAuthUser | null => {
+  const uid = user?.uid ?? user?.id;
+  if (!user || !uid) {
+    return null;
+  }
+
+  return {
+    uid,
+    email: user.email ?? null,
+    username: user.username ?? null,
+    accountName: user.accountName ?? null
+  };
+};
+
+const requireUser = (user: CloudBaseRawAuthUser | null | undefined): CloudBaseAuthUser => {
+  const normalizedUser = normalizeCloudBaseUser(user);
+  if (!normalizedUser) {
     throw new Error("CloudBase did not return an authenticated user.");
   }
-  return user;
+  return normalizedUser;
 };
 
 export function createAuthService(authClient: CloudBaseAuthClient): AuthService {
   return {
     async getCurrentUser() {
-      return assertCloudBaseOk(await authClient.getSession())?.user ?? null;
+      return normalizeCloudBaseUser(assertCloudBaseOk(await authClient.getSession())?.user);
     },
 
     async startEmailSignUp(credentials) {
@@ -153,7 +176,9 @@ export function createAuthService(authClient: CloudBaseAuthClient): AuthService 
     },
 
     onAuthStateChanged(listener) {
-      const subscription = authClient.onAuthStateChange((_event, session) => listener(session?.user ?? null));
+      const subscription = authClient.onAuthStateChange((_event, session) =>
+        listener(normalizeCloudBaseUser(session?.user))
+      );
       if (typeof subscription === "function") {
         return subscription;
       }

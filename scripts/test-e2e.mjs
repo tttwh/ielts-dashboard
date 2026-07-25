@@ -9,6 +9,13 @@ const serverHost = "127.0.0.1";
 const serverPort = process.env.PLAYWRIGHT_TEST_PORT ?? "4173";
 const baseURL = process.env.PLAYWRIGHT_TEST_BASE_URL ?? `http://${serverHost}:${serverPort}`;
 const viteCli = join(process.cwd(), "node_modules", "vite", "bin", "vite.js");
+const e2eServerEnv = {
+  ...process.env,
+  VITE_CLOUDBASE_ACCESS_KEY: process.env.VITE_CLOUDBASE_ACCESS_KEY ?? "e2e-public-access-key",
+  VITE_CLOUDBASE_ENV_ID: process.env.VITE_CLOUDBASE_ENV_ID ?? "e2e-cloudbase-env",
+  VITE_CLOUDBASE_REGION: process.env.VITE_CLOUDBASE_REGION ?? "ap-shanghai",
+  VITE_E2E_FAKE_CLOUDBASE: process.env.VITE_E2E_FAKE_CLOUDBASE ?? "true"
+};
 
 function hasPlaywrightSpecs(directory) {
   if (!existsSync(directory)) {
@@ -131,7 +138,7 @@ function startServer() {
       {
         cwd: process.cwd(),
         stdio: "ignore",
-        env: process.env,
+        env: e2eServerEnv,
         detached: process.platform !== "win32"
       }
     );

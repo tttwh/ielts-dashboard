@@ -101,13 +101,14 @@ describe("App", () => {
     expect(screen.getByText("Study data key: ielts-dashboard-state")).toBeVisible();
   });
 
-  it("renders localized offline sync status in Chinese when CloudBase is configured", () => {
+  it("renders localized guest sync status in Chinese when CloudBase is configured but unauthenticated", async () => {
     localStorage.setItem("ielts-dashboard-language", "zh");
     arrangeConfiguredCloudBase();
 
     render(<App />);
 
-    expect(screen.getByText("离线更改")).toBeVisible();
+    expect(await screen.findByText("本地访客")).toBeVisible();
+    expect(screen.queryByText("离线更改")).not.toBeInTheDocument();
     expect(screen.queryByText("Local changes are saved on this device.")).not.toBeInTheDocument();
   });
 

@@ -1,12 +1,15 @@
 node_modules/
 dist/
 .npm-cache/
+.env.local
+.env.*.local
 tsconfig*.tsbuildinfo
 *.tsbuildinfo
 playwright-report/
 test-results/
 coverage/
 logs/
+work/
 *.log
 yarn-error.log*
 npm-debug.log*

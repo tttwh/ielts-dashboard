@@ -21,9 +21,6 @@ export function createCloudBaseClient(config: CloudBaseConfig = readCloudBaseCon
   return cloudbase.init({
     env: config.envId,
     region: config.region,
-    accessKey: config.accessKey,
-    auth: {
-      detectSessionInUrl: true
-    }
+    accessKey: config.accessKey
   }) as unknown as CloudBaseClient;
 }

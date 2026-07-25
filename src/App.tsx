@@ -1,5 +1,5 @@
 import { AlertCircle, Cloud, CloudOff, RefreshCw } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AuthPanel } from "./components/auth/AuthPanel";
 import { AppShell } from "./components/layout/AppShell";
 import { SummaryHeader } from "./components/summary/SummaryHeader";
@@ -157,8 +157,10 @@ function DashboardApp() {
   );
   const currentDate = useCurrentDateKey();
   const authSession = useAuthSession(cloudRuntime?.authService ?? guestAuthService);
+  const lastAuthSyncKeyRef = useRef<string | null>(null);
   const {
     addTimerSession,
+    enterGuestMode,
     latestUnlockedAchievementId,
     state,
     syncNow,
@@ -190,11 +192,21 @@ function DashboardApp() {
 
   useEffect(() => {
     if (authSession.status !== "authenticated" || !authSession.user) {
+      lastAuthSyncKeyRef.current = null;
+      if (authSession.status !== "loading") {
+        enterGuestMode();
+      }
       return;
     }
 
+    const syncKey = `${authSession.user.uid}\u0000${accountName ?? ""}`;
+    if (lastAuthSyncKeyRef.current === syncKey) {
+      return;
+    }
+
+    lastAuthSyncKeyRef.current = syncKey;
     void syncNow(authSession.user.uid, accountName);
-  }, [accountName, authSession.status, authSession.user, syncNow]);
+  }, [accountName, authSession.status, authSession.user, enterGuestMode, syncNow]);
 
   const handleViewChange = (view: DashboardView) => {
     setActiveView(view);

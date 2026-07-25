@@ -11,13 +11,21 @@ export interface CloudBaseAuthUser {
   accountName: string | null;
 }
 
+export interface CloudBaseRawAuthUser {
+  uid?: string;
+  id?: string;
+  email?: string | null;
+  username?: string | null;
+  accountName?: string | null;
+}
+
 export interface CloudBaseAuthError {
   message?: string;
   code?: string;
 }
 
 export interface CloudBaseAuthResponseData {
-  user?: CloudBaseAuthUser | null;
+  user?: CloudBaseRawAuthUser | null;
   session?: unknown;
   messageId?: string;
   verifyOtp?: (params: { token: string; messageId?: string }) => Promise<CloudBaseAuthResponse>;
@@ -34,7 +42,7 @@ export interface CloudBaseAuthClient {
   signOut(input?: { options?: { clearStorage?: boolean } }): Promise<CloudBaseAuthResponse | void>;
   getSession(): Promise<CloudBaseAuthResponse>;
   onAuthStateChange(
-    listener: (event: string, session: { user?: CloudBaseAuthUser | null } | null) => void
+    listener: (event: string, session: { user?: CloudBaseRawAuthUser | null } | null) => void
   ): { data?: { subscription?: { unsubscribe(): void } } } | (() => void);
 }
 

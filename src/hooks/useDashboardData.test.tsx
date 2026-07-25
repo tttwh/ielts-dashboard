@@ -382,6 +382,96 @@ describe("useDashboardData", () => {
     });
   });
 
+  it("returns to guest sync mode after authenticated sync is cleared", async () => {
+    const repo = createMemoryRepository();
+    const importOrLoad = vi.fn(async (_userId: string, localState: AppState) =>
+      syncedResult(withUserId(localState, "cloud-user-1"))
+    );
+    const push = vi.fn<SyncManager["push"]>();
+    const syncManager: SyncManager = {
+      importOrLoad,
+      push
+    };
+    const { result } = renderHook(() => useDashboardData(repo, today, syncManager));
+
+    await act(async () => {
+      await result.current.syncNow("cloud-user-1", "weihao_01");
+    });
+
+    expect(result.current.syncState.mode).toBe("synced");
+
+    act(() => {
+      result.current.enterGuestMode();
+    });
+
+    expect(result.current.syncState).toEqual({
+      mode: "guest",
+      message: null,
+      lastSyncedAt: null
+    });
+
+    act(() => {
+      result.current.updateTodayRecord({ words: 100 });
+    });
+
+    expect(result.current.syncState).toEqual({
+      mode: "guest",
+      message: null,
+      lastSyncedAt: null
+    });
+    expect(repo.loadAppState().records[0]).toMatchObject({
+      words: 100,
+      syncStatus: "local-only"
+    });
+
+    await act(async () => {
+      await result.current.syncNow("cloud-user-1", "weihao_01");
+    });
+
+    expect(importOrLoad).toHaveBeenCalledTimes(2);
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("ignores an in-flight sync result after returning to guest mode", async () => {
+    const repo = createMemoryRepository();
+    let resolveImport: (result: SyncResult) => void = () => undefined;
+    const importPromise = new Promise<SyncResult>((resolve) => {
+      resolveImport = resolve;
+    });
+    const importOrLoad = vi.fn<SyncManager["importOrLoad"]>(() => importPromise);
+    const push = vi.fn<SyncManager["push"]>();
+    const syncManager: SyncManager = {
+      importOrLoad,
+      push
+    };
+    const { result } = renderHook(() => useDashboardData(repo, today, syncManager));
+
+    let syncPromise: Promise<void> = Promise.resolve();
+    act(() => {
+      syncPromise = result.current.syncNow("cloud-user-1", "weihao_01");
+    });
+
+    expect(result.current.syncState.mode).toBe("syncing");
+
+    act(() => {
+      result.current.enterGuestMode();
+    });
+
+    expect(result.current.syncState.mode).toBe("guest");
+
+    await act(async () => {
+      resolveImport(syncedResult(withUserId(createState(), "cloud-user-1")));
+      await syncPromise;
+    });
+
+    expect(result.current.syncState).toEqual({
+      mode: "guest",
+      message: null,
+      lastSyncedAt: null
+    });
+    expect(push).not.toHaveBeenCalled();
+  });
+
   it("keeps local writes local and pushes the latest state on later sync", async () => {
     const repo = createMemoryRepository();
     let resolvePush: (result: SyncResult) => void = () => undefined;

@@ -206,6 +206,7 @@ function arrangeDashboardData() {
   const updateDailyGoals = vi.fn();
   const updateTodayRecord = vi.fn();
   const addTimerSession = vi.fn();
+  const enterGuestMode = vi.fn();
   const syncNow = vi.fn().mockResolvedValue(undefined);
   const syncState = {
     lastSyncedAt: null,
@@ -216,6 +217,7 @@ function arrangeDashboardData() {
   state.records = [{ ...todayRecord, xpEarned: 135 }];
   mocks.useDashboardData.mockReturnValue({
     addTimerSession,
+    enterGuestMode,
     latestUnlockedAchievementId: "first-steps",
     state,
     syncNow,
@@ -228,6 +230,7 @@ function arrangeDashboardData() {
 
   return {
     addTimerSession,
+    enterGuestMode,
     state,
     syncNow,
     syncState,
@@ -348,6 +351,21 @@ describe("App composition", () => {
       expect(data.syncNow).toHaveBeenCalledWith("cloud-user-1", "weihao@example.com");
     });
     expect(authSession.user).toMatchObject({ uid: "cloud-user-1" });
+  });
+
+  it("tells dashboard data to return to guest sync mode when auth is unauthenticated", async () => {
+    const data = arrangeDashboardData();
+    arrangeAuthSession({
+      status: "guest",
+      user: null
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(data.enterGuestMode).toHaveBeenCalledOnce();
+    });
+    expect(data.syncNow).not.toHaveBeenCalled();
   });
 
   it("wires the check-in page when the check-in route is active", () => {

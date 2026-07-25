@@ -68,6 +68,7 @@ export interface DashboardData {
   updateTodayRecord(update: DailyRecordUpdate): void;
   addTimerSession(session: TimerSession): void;
   syncNow(userId: string, accountName: string | null): Promise<void>;
+  enterGuestMode(): void;
   latestUnlockedAchievementId: string | null;
   unlockAchievementsIfNeeded(): void;
 }
@@ -168,13 +169,12 @@ export function useDashboardData(
 ): DashboardData {
   const repo = useMemo(() => repository ?? createLocalStorageRepository(), [repository]);
   const [state, setState] = useState<AppState>(() => repo.loadAppState());
-  const [syncState, setSyncState] = useState<SyncState>(() =>
-    syncManager ? offlineSyncState(null) : guestSyncState()
-  );
+  const [syncState, setSyncState] = useState<SyncState>(() => guestSyncState());
   const [latestUnlockedAchievementId, setLatestUnlockedAchievementId] = useState<string | null>(null);
   const stateRef = useRef(state);
   const syncStateRef = useRef(syncState);
   const syncedUserIdRef = useRef<string | null>(null);
+  const syncEpochRef = useRef(0);
 
   const commitSyncState = useCallback((nextSyncState: SyncState) => {
     syncStateRef.current = nextSyncState;
@@ -223,14 +223,27 @@ export function useDashboardData(
   useEffect(() => {
     if (!syncManager) {
       syncedUserIdRef.current = null;
+      syncEpochRef.current += 1;
       commitSyncState(guestSyncState());
+    }
+  }, [commitSyncState, syncManager]);
+
+  const enterGuestMode = useCallback(() => {
+    const currentSyncState = syncStateRef.current;
+    const shouldReset =
+      syncedUserIdRef.current !== null ||
+      currentSyncState.mode !== "guest" ||
+      currentSyncState.message !== null ||
+      currentSyncState.lastSyncedAt !== null;
+
+    syncedUserIdRef.current = null;
+    if (!shouldReset) {
       return;
     }
 
-    if (syncStateRef.current.mode === "guest") {
-      commitSyncState(offlineSyncState(syncStateRef.current.lastSyncedAt));
-    }
-  }, [commitSyncState, syncManager]);
+    syncEpochRef.current += 1;
+    commitSyncState(guestSyncState());
+  }, [commitSyncState]);
 
   const commitState = useCallback(
     (mutation: AppStateMutation) => {
@@ -248,7 +261,7 @@ export function useDashboardData(
 
       stateRef.current = nextState;
       repo.saveAppState(nextState);
-      if (syncManager) {
+      if (syncManager && syncStateRef.current.mode !== "guest") {
         commitSyncState(offlineSyncState(syncStateRef.current.lastSyncedAt));
       }
       if (latestUnlockId) {
@@ -416,6 +429,7 @@ export function useDashboardData(
 
       const lastSyncedAt = syncStateRef.current.lastSyncedAt;
       const localState = stateRef.current;
+      const syncEpoch = syncEpochRef.current;
       const shouldImportOrLoad =
         syncedUserIdRef.current !== userId ||
         localState.profile.userId !== userId ||
@@ -429,7 +443,15 @@ export function useDashboardData(
           : await syncManager.push(localState, accountName);
 
         if (result.syncState.mode === "error") {
+          if (syncEpochRef.current !== syncEpoch) {
+            return;
+          }
+
           commitSyncState(result.syncState);
+          return;
+        }
+
+        if (syncEpochRef.current !== syncEpoch) {
           return;
         }
 
@@ -456,6 +478,10 @@ export function useDashboardData(
           syncedUserIdRef.current = userId;
         }
       } catch (error) {
+        if (syncEpochRef.current !== syncEpoch) {
+          return;
+        }
+
         commitSyncState(errorSyncState(error, lastSyncedAt));
       }
     },
@@ -471,6 +497,7 @@ export function useDashboardData(
     updateTodayRecord,
     addTimerSession,
     syncNow,
+    enterGuestMode,
     latestUnlockedAchievementId,
     unlockAchievementsIfNeeded
   };
