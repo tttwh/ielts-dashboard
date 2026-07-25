@@ -114,6 +114,20 @@ VITE_CLOUDBASE_ACCESS_KEY=demo-public-web-access-key
 
 上面是 `.env.local` 的假值示例，不是真实环境配置。真实 `.env.local` 只放在本机，不能提交到 Git。
 
+填好真实 `.env.local` 后，先运行：
+
+```powershell
+npm.cmd run verify:cloudbase-env
+```
+
+macOS / Linux 使用：
+
+```bash
+npm run verify:cloudbase-env
+```
+
+这个检查只允许前端公开的 `VITE_CLOUDBASE_ENV_ID`、`VITE_CLOUDBASE_REGION`、`VITE_CLOUDBASE_ACCESS_KEY` 三项，发现 Tencent SecretId、Tencent SecretKey、未替换占位值或 `.gitignore` 缺失保护时会失败。
+
 ## 本地优先行为
 
 - 任何学习操作先更新 React 状态和 `LocalStorage`。
@@ -170,6 +184,7 @@ CloudBase Web SDK 的 publishable access key 也只应作为环境配置使用�
 
 | 场景 | Windows PowerShell | macOS / Linux |
 | --- | --- | --- |
+| CloudBase 本地环境检查 | `npm.cmd run verify:cloudbase-env` | `npm run verify:cloudbase-env` |
 | CloudBase SQL 静态检查 | `npm.cmd run verify:cloudbase-sql` | `npm run verify:cloudbase-sql` |
 | 运行时未用源码检查 | `npm.cmd run verify:unused-runtime` | `npm run verify:unused-runtime` |
 | App 严格 TypeScript | `.\node_modules\.bin\tsc.cmd -p tsconfig.app.json --noEmit --noUnusedLocals --noUnusedParameters` | `./node_modules/.bin/tsc -p tsconfig.app.json --noEmit --noUnusedLocals --noUnusedParameters` |

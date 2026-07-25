@@ -49,11 +49,20 @@ VITE_CLOUDBASE_ACCESS_KEY=<your-web-publishable-key>
 
 Never commit `.env.local`, Tencent SecretId, Tencent SecretKey, manager credentials, service tokens, or real test account passwords.
 
+Run the local env guard after filling real values:
+
+```powershell
+npm.cmd run verify:cloudbase-env
+```
+
+The guard only allows `VITE_CLOUDBASE_ENV_ID`, `VITE_CLOUDBASE_REGION`, and `VITE_CLOUDBASE_ACCESS_KEY`.
+
 ## 5. Local Verification Commands
 
 Windows:
 
 ```powershell
+npm.cmd run verify:cloudbase-env
 npm.cmd run verify:cloudbase-sql
 npm.cmd run test
 npm.cmd run build
@@ -64,6 +73,7 @@ npm.cmd run dev -- --port 5185
 macOS:
 
 ```bash
+npm run verify:cloudbase-env
 npm run verify:cloudbase-sql
 npm run test
 npm run build
