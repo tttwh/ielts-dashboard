@@ -9,7 +9,6 @@ import type {
   UserProfile
 } from "../domain/types";
 import { evaluateAchievements } from "../domain/achievements";
-import { createDefaultAppState } from "../domain/defaults";
 import {
   createEmptyDailyRecord,
   recalculateDailyRecordProgress
@@ -19,6 +18,7 @@ import { createLocalStorageRepository } from "../services/storage/appRepository"
 import type {
   AppRepository,
   AppState,
+  AppStateCacheScope,
   AppStateMutation
 } from "../services/storage/storageTypes";
 import {
@@ -164,6 +164,8 @@ const successfulSyncState = (state: AppState, syncState: SyncState): AppState =>
   syncState.mode === "synced" ? markAppStateSynced(state) : state;
 
 const LOCAL_GUEST_USER_ID = "local-user";
+const GUEST_CACHE_SCOPE: AppStateCacheScope = { type: "guest" };
+const cloudCacheScope = (userId: string): AppStateCacheScope => ({ type: "cloud", userId });
 
 const isGuestAppState = (candidate: AppState) =>
   candidate.profile.userId === LOCAL_GUEST_USER_ID;
@@ -181,7 +183,9 @@ export function useDashboardData(
   const syncStateRef = useRef(syncState);
   const syncedUserIdRef = useRef<string | null>(null);
   const syncEpochRef = useRef(0);
-  const guestStateRef = useRef<AppState | null>(isGuestAppState(state) ? state : null);
+  const guestStateRef = useRef<AppState | null>(
+    isGuestAppState(state) ? state : repo.loadAppState(GUEST_CACHE_SCOPE)
+  );
 
   const commitSyncState = useCallback((nextSyncState: SyncState) => {
     syncStateRef.current = nextSyncState;
@@ -243,9 +247,7 @@ export function useDashboardData(
     const currentState = stateRef.current;
     const nextGuestState =
       guestStateRef.current ??
-      (isGuestAppState(currentState)
-        ? currentState
-        : createDefaultAppState(new Date().toISOString()));
+      (isGuestAppState(currentState) ? currentState : repo.loadAppState(GUEST_CACHE_SCOPE));
     const shouldRestoreState = currentState !== nextGuestState || !isGuestAppState(currentState);
     const shouldReset =
       syncedUserIdRef.current !== null ||
@@ -263,7 +265,7 @@ export function useDashboardData(
     guestStateRef.current = nextGuestState;
     if (shouldRestoreState) {
       stateRef.current = nextGuestState;
-      repo.saveAppState(nextGuestState);
+      repo.saveAppState(nextGuestState, GUEST_CACHE_SCOPE);
       setState(nextGuestState);
     }
     commitSyncState(guestSyncState());
@@ -285,9 +287,10 @@ export function useDashboardData(
 
       stateRef.current = nextState;
       repo.saveAppState(nextState);
-      if (syncStateRef.current.mode === "guest") {
+      if (isGuestAppState(nextState)) {
         guestStateRef.current = nextState;
-      } else if (syncManager) {
+      }
+      if (syncStateRef.current.mode !== "guest" && syncManager) {
         commitSyncState(offlineSyncState(syncStateRef.current.lastSyncedAt));
       }
       if (latestUnlockId) {
@@ -454,8 +457,13 @@ export function useDashboardData(
       }
 
       const lastSyncedAt = syncStateRef.current.lastSyncedAt;
-      const localState = stateRef.current;
+      const currentStateAtStart = stateRef.current;
       const syncEpoch = syncEpochRef.current;
+      const targetCacheScope = cloudCacheScope(userId);
+      const localState =
+        currentStateAtStart.profile.userId === userId || isGuestAppState(currentStateAtStart)
+          ? currentStateAtStart
+          : repo.loadAppState(targetCacheScope);
       const shouldImportOrLoad =
         syncedUserIdRef.current !== userId ||
         localState.profile.userId !== userId ||
@@ -477,6 +485,18 @@ export function useDashboardData(
             return;
           }
 
+          if (shouldImportOrLoad) {
+            const nextState = result.state;
+            stateRef.current = nextState;
+            repo.saveAppState(
+              nextState,
+              isGuestAppState(nextState) ? GUEST_CACHE_SCOPE : cloudCacheScope(nextState.profile.userId)
+            );
+            if (isGuestAppState(nextState)) {
+              guestStateRef.current = nextState;
+            }
+            setState(nextState);
+          }
           commitSyncState(result.syncState);
           return;
         }

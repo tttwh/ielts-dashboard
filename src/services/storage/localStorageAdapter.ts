@@ -1,6 +1,10 @@
-import type { AppState } from "./storageTypes";
+import type { AppState, AppStateCacheScope } from "./storageTypes";
 
 const STORAGE_KEY = "ielts-dashboard-state";
+const ACTIVE_CACHE_KEY = `${STORAGE_KEY}:active`;
+const GUEST_STORAGE_KEY = `${STORAGE_KEY}:guest`;
+const CLOUD_STORAGE_KEY_PREFIX = `${STORAGE_KEY}:cloud:`;
+const LOCAL_GUEST_USER_ID = "local-user";
 const IELTS_SECTIONS = ["listening", "speaking", "reading", "writing"] as const;
 const PROFILE_SYNC_STATUSES = ["local", "cloud-ready", "synced"] as const;
 const SYNC_STATUSES = ["local-only", "synced", "pending", "conflict", "sync-error"] as const;
@@ -118,8 +122,7 @@ const isAppState = (value: unknown): value is AppState => {
   );
 };
 
-export function readState(): AppState | null {
-  const rawState = localStorage.getItem(STORAGE_KEY);
+const parseState = (rawState: string | null): AppState | null => {
   if (!rawState) return null;
 
   try {
@@ -128,8 +131,66 @@ export function readState(): AppState | null {
   } catch {
     return null;
   }
+};
+
+const storageKeyForScope = (scope: AppStateCacheScope) =>
+  scope.type === "guest"
+    ? GUEST_STORAGE_KEY
+    : `${CLOUD_STORAGE_KEY_PREFIX}${encodeURIComponent(scope.userId)}`;
+
+const cacheScopeForState = (state: AppState): AppStateCacheScope =>
+  state.profile.userId === LOCAL_GUEST_USER_ID
+    ? { type: "guest" }
+    : { type: "cloud", userId: state.profile.userId };
+
+const stateMatchesScope = (state: AppState, scope: AppStateCacheScope) =>
+  scope.type === "guest"
+    ? state.profile.userId === LOCAL_GUEST_USER_ID
+    : state.profile.userId === scope.userId;
+
+const migrateLegacyState = (state: AppState): AppState => {
+  const scopedStorageKey = storageKeyForScope(cacheScopeForState(state));
+
+  if (!localStorage.getItem(scopedStorageKey)) {
+    localStorage.setItem(scopedStorageKey, JSON.stringify(state));
+  }
+  if (!localStorage.getItem(ACTIVE_CACHE_KEY)) {
+    localStorage.setItem(ACTIVE_CACHE_KEY, scopedStorageKey);
+  }
+
+  return state;
+};
+
+const readScopedState = (scope: AppStateCacheScope): AppState | null => {
+  const scopedState = parseState(localStorage.getItem(storageKeyForScope(scope)));
+  if (scopedState) return scopedState;
+
+  const legacyState = parseState(localStorage.getItem(STORAGE_KEY));
+  return legacyState && stateMatchesScope(legacyState, scope) ? migrateLegacyState(legacyState) : null;
+};
+
+export function readState(scope?: AppStateCacheScope): AppState | null {
+  if (scope) {
+    return readScopedState(scope);
+  }
+
+  const activeCacheKey = localStorage.getItem(ACTIVE_CACHE_KEY);
+  if (activeCacheKey) {
+    const activeState = parseState(localStorage.getItem(activeCacheKey));
+    if (activeState) return activeState;
+  }
+
+  const legacyState = parseState(localStorage.getItem(STORAGE_KEY));
+  if (legacyState) return migrateLegacyState(legacyState);
+
+  return parseState(localStorage.getItem(GUEST_STORAGE_KEY));
 }
 
-export function writeState(state: AppState): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+export function writeState(state: AppState, scope: AppStateCacheScope = cacheScopeForState(state)): void {
+  const serializedState = JSON.stringify(state);
+  const scopedStorageKey = storageKeyForScope(scope);
+
+  localStorage.setItem(scopedStorageKey, serializedState);
+  localStorage.setItem(STORAGE_KEY, serializedState);
+  localStorage.setItem(ACTIVE_CACHE_KEY, scopedStorageKey);
 }

@@ -103,6 +103,9 @@ const syncLabel = (t: ReturnType<typeof useI18n>["t"], syncState: SyncState) => 
   }
 };
 
+const syncMessage = (t: ReturnType<typeof useI18n>["t"], syncState: SyncState) =>
+  syncState.code ? t.sync.messages[syncState.code] : syncState.message;
+
 function SyncStatusBadge({
   cloudbaseConfigured,
   syncState
@@ -112,6 +115,7 @@ function SyncStatusBadge({
 }) {
   const { t } = useI18n();
   const label = syncLabel(t, syncState);
+  const message = syncMessage(t, syncState);
   const Icon =
     syncState.mode === "error"
       ? AlertCircle
@@ -133,9 +137,9 @@ function SyncStatusBadge({
         </span>
         <div className="min-w-0">
           <p className="break-words font-mono text-sm font-semibold text-ink">{label}</p>
-          {syncState.message ? (
+          {message ? (
             <p className="mt-0.5 break-words text-xs font-medium text-muted">
-              {syncState.message}
+              {message}
             </p>
           ) : null}
         </div>

@@ -5,12 +5,17 @@ const normalizedSql = sql.toLowerCase();
 
 const tables = [
   "profiles",
-  "user_settings",
   "goals",
   "daily_records",
   "timer_sessions",
   "achievements",
 ];
+
+const policyNames = tables.flatMap((table) => [
+  `${table}_select_own`,
+  `${table}_insert_own`,
+  `${table}_update_own`,
+]);
 
 const forbidden = [
   "secretId",
@@ -57,6 +62,12 @@ for (const table of tables) {
   if (!sql.includes(`${table}_update_own`)) missing.push(`${table} update policy`);
 }
 
+for (const policyName of policyNames) {
+  if (!sql.includes(`drop policy if exists ${policyName}`)) {
+    missing.push(`${policyName} idempotent drop`);
+  }
+}
+
 for (const value of forbidden) {
   if (normalizedSql.includes(value.toLowerCase())) {
     missing.push(`forbidden credential marker ${value}`);
@@ -71,7 +82,10 @@ if (/\buser_id\s+uuid\b/i.test(sql)) {
   missing.push("stale uuid user_id column");
 }
 
+const profilesTable = getCreateTableBody("profiles");
 const goalsTable = getCreateTableBody("goals");
+const dailyRecordsTable = getCreateTableBody("daily_records");
+
 if (!/\buser_id\s+varchar\(64\)[^\n,]*\bprimary key\b[^\n,]*\breferences auth\.users\(id\)/i.test(goalsTable)) {
   missing.push("goals user_id primary key");
 }
@@ -82,6 +96,30 @@ if (/\bgoal_id\b/i.test(goalsTable)) {
 
 if (/goals_one_active_per_user_idx/i.test(sql)) {
   missing.push("stale goals partial user index");
+}
+
+if (!/\brecord_id\s+text\s+primary key\b/i.test(dailyRecordsTable)) {
+  missing.push("daily_records record_id text primary key");
+}
+
+if (/\brecord_id\s+uuid\b/i.test(dailyRecordsTable)) {
+  missing.push("stale daily_records uuid record_id column");
+}
+
+if (!/\bstatus\s+text\s+not null\s+default 'active'\s+check\s*\(status in \('active', 'disabled', 'pending'\)\)/i.test(profilesTable)) {
+  missing.push("profiles server-managed status column");
+}
+
+if (!/profiles_insert_own[\s\S]*with check\s*\(\s*user_id\s*=\s*\(select auth\.uid\(\)\)\s+and\s+status\s*=\s*'active'\s*\)/i.test(sql)) {
+  missing.push("profiles insert active status check");
+}
+
+if (
+  !/create or replace function public\.prevent_profile_status_update_by_authenticated/i.test(sql) ||
+  !/new\.status\s+is\s+distinct\s+from\s+old\.status/i.test(sql) ||
+  !/execute function public\.prevent_profile_status_update_by_authenticated\(\)/i.test(sql)
+) {
+  missing.push("profile status update guard");
 }
 
 if (!sql.includes("with check (user_id = (select auth.uid()))")) {

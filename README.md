@@ -110,15 +110,20 @@ VITE_CLOUDBASE_ACCESS_KEY=demo-public-web-access-key
 - 任何学习操作先更新 React 状态和 `LocalStorage`。
 - 未登录、CloudBase 未配置、网络失败时，看板继续可用。
 - 首次登录后，如果云端没有数据，会把本地访客数据替换为当前 CloudBase 用户 ID 后上传。
+- 如果浏览器当前缓存属于另一个 CloudBase 用户，不会导入或上传这份数据；应用会切换到当前用户自己的本地缓存或云端状态。
 - 如果云端已有数据，会按实体 key 和 `updatedAt` 做合并。
 - 同步失败不会删除本地数据，界面会显示离线或错误状态。
-- 退出登录会回到访客/本地模式，本地缓存仍保留。
+- 退出登录会回到访客/本地模式，访客缓存和每个 CloudBase 用户缓存分开保留。
+- 语言切换只保存在本地 UI 设置中，当前版本不做云端语言同步。
 
 LocalStorage keys：
 
 ```text
-ielts-dashboard-state
-ielts-dashboard-language
+ielts-dashboard-state                     # active cache mirror for legacy compatibility
+ielts-dashboard-state:guest               # guest/local-user study state
+ielts-dashboard-state:cloud:<userId>      # per-CloudBase-user study state
+ielts-dashboard-state:active              # active scoped cache pointer
+ielts-dashboard-language                  # local UI language only
 ```
 
 ## 密钥安全

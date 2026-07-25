@@ -8,11 +8,16 @@ import {
 } from "../domain/progress";
 import type { SyncManager } from "../services/sync/syncManager";
 import type { SyncResult } from "../services/sync/syncTypes";
-import { createMemoryRepository } from "../services/storage/appRepository";
+import {
+  createLocalStorageRepository,
+  createMemoryRepository
+} from "../services/storage/appRepository";
 import { useDashboardData } from "./useDashboardData";
 
 const today = "2026-07-22";
 const now = "2026-07-22T08:00:00.000Z";
+const legacyStorageKey = "ielts-dashboard-state";
+const cloudStorageKey = (userId: string) => `ielts-dashboard-state:cloud:${userId}`;
 
 const createState = (): AppState => createDefaultAppState("2026-07-22T00:00:00.000Z");
 
@@ -85,6 +90,7 @@ describe("useDashboardData", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(now));
+    localStorage.clear();
   });
 
   afterEach(() => {
@@ -837,6 +843,90 @@ describe("useDashboardData", () => {
     expect(repo.loadAppState().records[0]).toMatchObject({
       userId: "local-user",
       words: 25
+    });
+  });
+
+  it("loads user B local cache instead of importing active user A cache on account switch", async () => {
+    const userAState = createRecordForUser(
+      withUserId(createState(), "cloud-user-a"),
+      "cloud-user-a",
+      900
+    );
+    const userBState = createRecordForUser(
+      withUserId(createState(), "cloud-user-b"),
+      "cloud-user-b",
+      55
+    );
+    localStorage.setItem(legacyStorageKey, JSON.stringify(userAState));
+    localStorage.setItem(cloudStorageKey("cloud-user-b"), JSON.stringify(userBState));
+    const repo = createLocalStorageRepository();
+    const importOrLoad = vi.fn(async (_userId: string, localState: AppState) =>
+      syncedResult(localState)
+    );
+    const syncManager: SyncManager = {
+      importOrLoad,
+      push: vi.fn()
+    };
+    const { result } = renderHook(() => useDashboardData(repo, today, syncManager));
+
+    expect(result.current.state.profile.userId).toBe("cloud-user-a");
+
+    await act(async () => {
+      await result.current.syncNow("cloud-user-b", "user-b@example.com");
+    });
+
+    expect(importOrLoad).toHaveBeenCalledWith(
+      "cloud-user-b",
+      expect.objectContaining({
+        profile: expect.objectContaining({ userId: "cloud-user-b" }),
+        records: [expect.objectContaining({ userId: "cloud-user-b", words: 55 })]
+      }),
+      "user-b@example.com"
+    );
+    expect(result.current.state.profile.userId).toBe("cloud-user-b");
+    expect(result.current.todayRecord.words).toBe(55);
+  });
+
+  it("does not overwrite pending cloud-user cache when logout enters guest mode", () => {
+    const userAState = createRecordForUser(
+      withUserId(createState(), "cloud-user-a"),
+      "cloud-user-a",
+      900
+    );
+    const pendingUserAState: AppState = {
+      ...userAState,
+      records: [
+        {
+          ...userAState.records[0],
+          syncStatus: "sync-error"
+        }
+      ]
+    };
+    localStorage.setItem(legacyStorageKey, JSON.stringify(pendingUserAState));
+    localStorage.setItem(cloudStorageKey("cloud-user-a"), JSON.stringify(pendingUserAState));
+    const repo = createLocalStorageRepository();
+    const syncManager: SyncManager = {
+      importOrLoad: vi.fn(),
+      push: vi.fn()
+    };
+    const { result } = renderHook(() => useDashboardData(repo, today, syncManager));
+
+    act(() => {
+      result.current.enterGuestMode();
+    });
+
+    expect(result.current.state.profile.userId).toBe("local-user");
+    expect(
+      createLocalStorageRepository().loadAppState({ type: "cloud", userId: "cloud-user-a" })
+    ).toMatchObject({
+      profile: expect.objectContaining({ userId: "cloud-user-a" }),
+      records: [
+        expect.objectContaining({
+          userId: "cloud-user-a",
+          words: 900,
+          syncStatus: "sync-error"
+        })
+      ]
     });
   });
 });

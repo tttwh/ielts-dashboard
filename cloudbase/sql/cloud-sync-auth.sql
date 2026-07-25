@@ -10,13 +10,6 @@ create table if not exists public.profiles (
   updated_at timestamptz not null default now()
 );
 
-create table if not exists public.user_settings (
-  user_id varchar(64) primary key default auth.uid() references auth.users(id),
-  language text not null default 'zh-CN' check (language in ('zh-CN', 'en')),
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
 create table if not exists public.goals (
   user_id varchar(64) primary key default auth.uid() references auth.users(id),
   overall_band numeric not null,
@@ -35,7 +28,7 @@ create table if not exists public.goals (
 );
 
 create table if not exists public.daily_records (
-  record_id uuid primary key default gen_random_uuid(),
+  record_id text primary key,
   user_id varchar(64) not null default auth.uid() references auth.users(id),
   record_date date not null,
   words_memorized integer not null,
@@ -86,30 +79,55 @@ create unique index if not exists daily_records_user_date_active_idx
   where deleted_at is null;
 
 alter table public.profiles enable row level security;
-alter table public.user_settings enable row level security;
 alter table public.goals enable row level security;
 alter table public.daily_records enable row level security;
 alter table public.timer_sessions enable row level security;
 alter table public.achievements enable row level security;
+
+create or replace function public.prevent_profile_status_update_by_authenticated()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.role() = 'authenticated' and new.status is distinct from old.status then
+    raise exception 'profile status is managed by server';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists profiles_status_update_guard on public.profiles;
+create trigger profiles_status_update_guard
+  before update on public.profiles
+  for each row
+  execute function public.prevent_profile_status_update_by_authenticated();
+
+drop policy if exists profiles_select_own on public.profiles;
+drop policy if exists profiles_insert_own on public.profiles;
+drop policy if exists profiles_update_own on public.profiles;
+drop policy if exists goals_select_own on public.goals;
+drop policy if exists goals_insert_own on public.goals;
+drop policy if exists goals_update_own on public.goals;
+drop policy if exists daily_records_select_own on public.daily_records;
+drop policy if exists daily_records_insert_own on public.daily_records;
+drop policy if exists daily_records_update_own on public.daily_records;
+drop policy if exists timer_sessions_select_own on public.timer_sessions;
+drop policy if exists timer_sessions_insert_own on public.timer_sessions;
+drop policy if exists timer_sessions_update_own on public.timer_sessions;
+drop policy if exists achievements_select_own on public.achievements;
+drop policy if exists achievements_insert_own on public.achievements;
+drop policy if exists achievements_update_own on public.achievements;
 
 create policy profiles_select_own on public.profiles
   for select to authenticated
   using (user_id = (select auth.uid()));
 create policy profiles_insert_own on public.profiles
   for insert to authenticated
-  with check (user_id = (select auth.uid()));
+  with check (user_id = (select auth.uid()) and status = 'active');
 create policy profiles_update_own on public.profiles
-  for update to authenticated
-  using (user_id = (select auth.uid()))
-  with check (user_id = (select auth.uid()));
-
-create policy user_settings_select_own on public.user_settings
-  for select to authenticated
-  using (user_id = (select auth.uid()));
-create policy user_settings_insert_own on public.user_settings
-  for insert to authenticated
-  with check (user_id = (select auth.uid()));
-create policy user_settings_update_own on public.user_settings
   for update to authenticated
   using (user_id = (select auth.uid()))
   with check (user_id = (select auth.uid()));

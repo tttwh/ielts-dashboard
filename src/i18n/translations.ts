@@ -1,4 +1,5 @@
 import type { Achievement, IeltsSection } from "../domain/types";
+import type { SyncErrorCode } from "../services/sync/syncTypes";
 
 export type Language = "en" | "zh";
 
@@ -70,6 +71,7 @@ export interface I18nText {
     offline: string;
     error: string;
     cloudbaseReady: string;
+    messages: Record<SyncErrorCode, string>;
   };
   checkIn: {
     regionLabel: string;
@@ -314,7 +316,12 @@ export const translations: Record<Language, I18nText> = {
       synced: "Synced",
       offline: "Offline changes",
       error: "Sync error",
-      cloudbaseReady: "CloudBase ready"
+      cloudbaseReady: "CloudBase ready",
+      messages: {
+        "account-disabled": "This account is disabled. Cloud sync is blocked.",
+        "account-pending": "This account is pending review. Cloud sync is blocked.",
+        "foreign-cloud-cache": "Another account's local cache was detected. Import was stopped."
+      }
     },
     checkIn: {
       regionLabel: "Daily Check-In",
@@ -492,7 +499,12 @@ export const translations: Record<Language, I18nText> = {
       synced: "已同步",
       offline: "离线更改",
       error: "同步异常",
-      cloudbaseReady: "CloudBase 已就绪"
+      cloudbaseReady: "CloudBase 已就绪",
+      messages: {
+        "account-disabled": "账号已停用，云同步已阻断。",
+        "account-pending": "账号待审核，云同步已阻断。",
+        "foreign-cloud-cache": "检测到其他账号的本地缓存，已停止导入。"
+      }
     },
     checkIn: {
       regionLabel: "每日打卡",

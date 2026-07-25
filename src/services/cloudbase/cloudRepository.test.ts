@@ -157,8 +157,7 @@ const createCloudSelectData = (state = createFilledState()): FakeTableData => {
   const rows = appStateToCloudRows(state, "weihao_01");
 
   return {
-    profiles: [rows.profile],
-    user_settings: [rows.userSettings],
+    profiles: rows.profile ? [{ ...rows.profile, status: "active" }] : [],
     goals: [rows.goals],
     daily_records: rows.records,
     timer_sessions: rows.timerSessions,
@@ -176,13 +175,14 @@ describe("createCloudRepository", () => {
     expect(calls).toEqual(
       expect.arrayContaining([
         "profiles.eq(user_id,cloud-user-1)",
-        "user_settings.eq(user_id,cloud-user-1)",
         "goals.eq(user_id,cloud-user-1)",
         "daily_records.eq(user_id,cloud-user-1)",
         "timer_sessions.eq(user_id,cloud-user-1)",
         "achievements.eq(user_id,cloud-user-1)"
       ])
     );
+    expect(calls).not.toContain("user_settings.select()");
+    expect(calls).not.toContain("user_settings.eq(user_id,cloud-user-1)");
   });
 
   it("uses documented CloudBase RDB query order: select before eq", async () => {
@@ -193,7 +193,6 @@ describe("createCloudRepository", () => {
 
     for (const tableName of [
       "profiles",
-      "user_settings",
       "goals",
       "daily_records",
       "timer_sessions",
@@ -208,7 +207,7 @@ describe("createCloudRepository", () => {
 
   it.each([
     ["profiles", { profiles: [] }],
-    ["goals", { goals: [] }]
+    ["active profile goals", { goals: [] }]
   ])("returns null when %s rows are empty", async (_tableName, overrides) => {
     const { rdb } = createFakeRdb({
       selectData: {
@@ -220,6 +219,36 @@ describe("createCloudRepository", () => {
 
     await expect(repository.loadCloudState("cloud-user-1")).resolves.toBeNull();
   });
+
+  it.each(["disabled", "pending"] as const)(
+    "loads %s profile status even when the goals row is absent",
+    async (accountStatus) => {
+      const rows = appStateToCloudRows(createFilledState(), "weihao_01");
+      const { rdb } = createFakeRdb({
+        selectData: {
+          ...createCloudSelectData(),
+          profiles: rows.profile
+            ? [
+                {
+                  ...rows.profile,
+                  status: accountStatus
+                }
+              ]
+            : [],
+          goals: []
+        }
+      });
+      const repository = createCloudRepository(rdb);
+
+      const state = await repository.loadCloudState("cloud-user-1");
+
+      expect(state?.profile).toMatchObject({
+        userId: "cloud-user-1",
+        accountStatus,
+        syncStatus: "synced"
+      });
+    }
+  );
 
   it("loads cloud rows into app state", async () => {
     const { rdb } = createFakeRdb({ selectData: createCloudSelectData() });
@@ -249,12 +278,7 @@ describe("createCloudRepository", () => {
     expect(upserts).toEqual([
       {
         tableName: "profiles",
-        values: rows.profile,
-        onConflict: "user_id"
-      },
-      {
-        tableName: "user_settings",
-        values: rows.userSettings,
+        values: expect.not.objectContaining({ status: expect.any(String) }),
         onConflict: "user_id"
       },
       {

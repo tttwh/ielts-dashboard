@@ -1,7 +1,7 @@
 import type { Achievement, DailyRecord, TimerSession } from "../../domain/types";
 import type { CloudRepository } from "../cloudbase/cloudRepository";
 import type { AppState } from "../storage/storageTypes";
-import type { SyncResult } from "./syncTypes";
+import type { SyncErrorCode, SyncResult } from "./syncTypes";
 
 export type { SyncMode, SyncResult, SyncState } from "./syncTypes";
 
@@ -32,6 +32,21 @@ const failed = (state: AppState, error: unknown): SyncResult => ({
   }
 });
 
+const failedWithCode = (state: AppState, code: SyncErrorCode): SyncResult => ({
+  state,
+  syncState: {
+    mode: "error",
+    code,
+    message: null,
+    lastSyncedAt: null
+  }
+});
+
+const LOCAL_GUEST_USER_ID = "local-user";
+
+const isForeignCloudState = (state: AppState, userId: string) =>
+  state.profile.userId !== LOCAL_GUEST_USER_ID && state.profile.userId !== userId;
+
 const blockingAccountStatus = (state: AppState) => {
   const status = state.profile.accountStatus;
   return status === "disabled" || status === "pending" ? status : null;
@@ -40,7 +55,7 @@ const blockingAccountStatus = (state: AppState) => {
 const blockedAccountSync = (
   state: AppState,
   status: NonNullable<AppState["profile"]["accountStatus"]>
-): SyncResult => failed(state, new Error(`Cloud sync is blocked for ${status} accounts.`));
+): SyncResult => failedWithCode(state, status === "disabled" ? "account-disabled" : "account-pending");
 
 const newerByUpdatedAt = <T extends { updatedAt: string }>(localItem: T, cloudItem: T): T =>
   localItem.updatedAt > cloudItem.updatedAt ? localItem : cloudItem;
@@ -155,6 +170,10 @@ export function markAppStateSynced(state: AppState): AppState {
 export function createSyncManager(repository: CloudRepository): SyncManager {
   return {
     async importOrLoad(userId, localState, accountName) {
+      if (isForeignCloudState(localState, userId)) {
+        return failedWithCode(localState, "foreign-cloud-cache");
+      }
+
       const localBlockingStatus = blockingAccountStatus(localState);
       if (localBlockingStatus) {
         return blockedAccountSync(localState, localBlockingStatus);

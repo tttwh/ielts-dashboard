@@ -341,4 +341,95 @@ describe("local storage repository", () => {
       syncStatus: "pending"
     });
   });
+
+  it("keeps guest and cloud-user caches in separate local storage slots", () => {
+    const repo = createLocalStorageRepository();
+    const guestState = createStoredState({
+      records: [{ ...validRecord, words: 25 }]
+    }) as AppState;
+    const userAState = createStoredState({
+      profile: {
+        ...validProfile,
+        userId: "cloud-user-a",
+        syncStatus: "synced"
+      },
+      dailyGoals: {
+        ...validDailyGoals,
+        userId: "cloud-user-a",
+        syncStatus: "sync-error"
+      },
+      records: [
+        {
+          ...validRecord,
+          userId: "cloud-user-a",
+          words: 900,
+          syncStatus: "sync-error"
+        }
+      ]
+    }) as AppState;
+
+    repo.saveAppState(userAState, { type: "cloud", userId: "cloud-user-a" });
+    repo.saveAppState(guestState, { type: "guest" });
+
+    expect(
+      createLocalStorageRepository().loadAppState({ type: "cloud", userId: "cloud-user-a" })
+    ).toMatchObject({
+      profile: expect.objectContaining({ userId: "cloud-user-a" }),
+      records: [
+        expect.objectContaining({
+          userId: "cloud-user-a",
+          words: 900,
+          syncStatus: "sync-error"
+        })
+      ]
+    });
+    expect(createLocalStorageRepository().loadAppState({ type: "guest" })).toMatchObject({
+      profile: expect.objectContaining({ userId: "local-user" }),
+      records: [expect.objectContaining({ userId: "local-user", words: 25 })]
+    });
+  });
+
+  it("migrates a legacy cloud-user cache before guest writes replace the active mirror", () => {
+    const userAState = createStoredState({
+      profile: {
+        ...validProfile,
+        userId: "cloud-user-a",
+        syncStatus: "synced"
+      },
+      dailyGoals: {
+        ...validDailyGoals,
+        userId: "cloud-user-a",
+        syncStatus: "sync-error"
+      },
+      records: [
+        {
+          ...validRecord,
+          userId: "cloud-user-a",
+          words: 900,
+          syncStatus: "sync-error"
+        }
+      ]
+    }) as AppState;
+    const guestState = createStoredState({
+      records: [{ ...validRecord, words: 25 }]
+    }) as AppState;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(userAState));
+    const repo = createLocalStorageRepository();
+
+    expect(repo.loadAppState().profile.userId).toBe("cloud-user-a");
+    repo.saveAppState(guestState, { type: "guest" });
+
+    expect(
+      createLocalStorageRepository().loadAppState({ type: "cloud", userId: "cloud-user-a" })
+    ).toMatchObject({
+      profile: expect.objectContaining({ userId: "cloud-user-a" }),
+      records: [
+        expect.objectContaining({
+          userId: "cloud-user-a",
+          words: 900,
+          syncStatus: "sync-error"
+        })
+      ]
+    });
+  });
 });

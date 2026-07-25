@@ -107,17 +107,11 @@ describe("CloudBase cloud mappers", () => {
       user_id: "cloudbase-user-string",
       account_name: "weihao_01",
       email: null,
-      status: "active",
       display_name: null,
       created_at: now,
       updated_at: updatedAt
     });
-    expect(rows.userSettings).toEqual({
-      user_id: "cloudbase-user-string",
-      language: "zh-CN",
-      created_at: now,
-      updated_at: updatedAt
-    });
+    expect(rows).not.toHaveProperty("userSettings");
     expect(rows.goals).toEqual({
       user_id: "cloudbase-user-string",
       overall_band: 7.5,
@@ -195,7 +189,7 @@ describe("CloudBase cloud mappers", () => {
     ]);
   });
 
-  it("writes profile accountStatus to the CloudBase profile status row", () => {
+  it("does not write profile accountStatus because status is server-managed", () => {
     const state = {
       ...createFilledState(),
       profile: {
@@ -206,14 +200,20 @@ describe("CloudBase cloud mappers", () => {
 
     const rows = appStateToCloudRows(state, "weihao_01");
 
-    expect(rows.profile?.status).toBe("pending");
+    expect(rows.profile).not.toHaveProperty("status");
   });
 
   it("maps normalized PG rows back to app state", () => {
     const fallback = createDefaultAppState(now);
     const rows = appStateToCloudRows(createFilledState(), "weihao_01");
 
-    const restored = cloudRowsToAppState(rows, fallback);
+    const restored = cloudRowsToAppState(
+      {
+        ...rows,
+        profile: rows.profile ? { ...rows.profile, status: "active" } : null
+      },
+      fallback
+    );
 
     expect(restored.schemaVersion).toBe(1);
     expect(restored.profile).toEqual({

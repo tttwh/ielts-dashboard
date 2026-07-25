@@ -17,12 +17,7 @@ export interface ProfileRow {
   updated_at: string;
 }
 
-export interface UserSettingsRow {
-  user_id: string;
-  language: "zh-CN" | "en";
-  created_at: string;
-  updated_at: string;
-}
+export type ProfileWriteRow = Omit<ProfileRow, "status">;
 
 export interface GoalsRow {
   user_id: string;
@@ -88,8 +83,7 @@ export interface AchievementRow {
 }
 
 export interface CloudRows {
-  profile: ProfileRow | null;
-  userSettings: UserSettingsRow | null;
+  profile: ProfileRow | ProfileWriteRow | null;
   goals: GoalsRow | null;
   records: DailyRecordRow[];
   timerSessions: TimerSessionRow[];
@@ -116,14 +110,7 @@ export function appStateToCloudRows(state: AppState, accountName: string | null)
       user_id: state.profile.userId,
       account_name: accountName,
       email: null,
-      status: state.profile.accountStatus ?? "active",
       display_name: null,
-      created_at: state.profile.createdAt,
-      updated_at: state.profile.updatedAt
-    },
-    userSettings: {
-      user_id: state.profile.userId,
-      language: "zh-CN",
       created_at: state.profile.createdAt,
       updated_at: state.profile.updatedAt
     },
@@ -193,6 +180,7 @@ export function cloudRowsToAppState(rows: CloudRows, fallbackState: AppState): A
   const profile = rows.profile;
   const goals = rows.goals;
   const profileUserId = profile?.user_id ?? goals?.user_id ?? fallbackState.profile.userId;
+  const profileStatus = profile && "status" in profile ? profile.status : fallbackState.profile.accountStatus;
 
   return {
     schemaVersion: 1,
@@ -209,7 +197,7 @@ export function cloudRowsToAppState(rows: CloudRows, fallbackState: AppState): A
           }
         : cloneSectionTargets(fallbackState.profile.sectionTargets),
       syncStatus: profile || goals ? "synced" : fallbackState.profile.syncStatus,
-      accountStatus: profile?.status ?? fallbackState.profile.accountStatus,
+      accountStatus: profileStatus,
       createdAt: profile?.created_at ?? fallbackState.profile.createdAt,
       updatedAt: profile?.updated_at ?? fallbackState.profile.updatedAt
     },

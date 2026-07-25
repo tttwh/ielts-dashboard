@@ -435,6 +435,32 @@ describe("sync manager", () => {
     });
   });
 
+  it("does not import another cloud user's local cache into the requested account", async () => {
+    const userAState: AppState = {
+      ...replaceAppStateUserId(createDefaultAppState(now), "cloud-user-a"),
+      records: [
+        createRecord({
+          userId: "cloud-user-a",
+          words: 900,
+          syncStatus: "sync-error"
+        })
+      ]
+    };
+    const { repository } = createRepository();
+    const manager = createSyncManager(repository);
+
+    const result = await manager.importOrLoad("cloud-user-b", userAState, "user-b@example.com");
+
+    expect(repository.saveCloudState).not.toHaveBeenCalled();
+    expect(result.state).toEqual(userAState);
+    expect(result.syncState).toEqual({
+      mode: "error",
+      code: "foreign-cloud-cache",
+      message: null,
+      lastSyncedAt: null
+    });
+  });
+
   it.each(["disabled", "pending"] as const)(
     "blocks import before saving when the local account status is %s",
     async (accountStatus) => {
@@ -455,7 +481,8 @@ describe("sync manager", () => {
       expect(result.state).toEqual(localState);
       expect(result.syncState).toEqual({
         mode: "error",
-        message: `Cloud sync is blocked for ${accountStatus} accounts.`,
+        code: accountStatus === "disabled" ? "account-disabled" : "account-pending",
+        message: null,
         lastSyncedAt: null
       });
     }
@@ -482,7 +509,8 @@ describe("sync manager", () => {
       expect(result.state).toEqual(cloudState);
       expect(result.syncState).toEqual({
         mode: "error",
-        message: `Cloud sync is blocked for ${accountStatus} accounts.`,
+        code: accountStatus === "disabled" ? "account-disabled" : "account-pending",
+        message: null,
         lastSyncedAt: null
       });
     }
@@ -508,7 +536,8 @@ describe("sync manager", () => {
       expect(result.state).toEqual(state);
       expect(result.syncState).toEqual({
         mode: "error",
-        message: `Cloud sync is blocked for ${accountStatus} accounts.`,
+        code: accountStatus === "disabled" ? "account-disabled" : "account-pending",
+        message: null,
         lastSyncedAt: null
       });
     }

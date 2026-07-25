@@ -1,4 +1,4 @@
-import { render, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createDefaultAppState } from "./domain/defaults";
@@ -488,5 +488,23 @@ describe("App composition", () => {
       updateDailyGoals: data.updateDailyGoals,
       updateProfile: data.updateProfile
     });
+  });
+
+  it("localizes blocked account sync codes instead of showing English sync-layer text", () => {
+    localStorage.setItem("ielts-dashboard-language", "zh");
+    arrangeDashboardData({
+      syncState: {
+        code: "account-disabled",
+        lastSyncedAt: null,
+        message: "Cloud sync is blocked for disabled accounts.",
+        mode: "error"
+      }
+    });
+    arrangeAuthSession();
+
+    render(<App />);
+
+    expect(screen.getByText("账号已停用，云同步已阻断。")).toBeVisible();
+    expect(screen.queryByText("Cloud sync is blocked for disabled accounts.")).not.toBeInTheDocument();
   });
 });

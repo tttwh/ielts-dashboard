@@ -15,9 +15,18 @@ export interface AppState {
   achievements: Achievement[];
 }
 
+export type AppStateCacheScope =
+  | {
+      type: "guest";
+    }
+  | {
+      type: "cloud";
+      userId: string;
+    };
+
 export interface AppRepository {
-  loadAppState(): AppState;
-  saveAppState(state: AppState): void;
+  loadAppState(scope?: AppStateCacheScope): AppState;
+  saveAppState(state: AppState, scope?: AppStateCacheScope): void;
 }
 
 export type AppStateMutation = (state: AppState) => AppState;

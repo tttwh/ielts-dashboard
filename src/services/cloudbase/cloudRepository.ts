@@ -8,8 +8,8 @@ import {
   type DailyRecordRow,
   type GoalsRow,
   type ProfileRow,
-  type TimerSessionRow,
-  type UserSettingsRow
+  type ProfileWriteRow,
+  type TimerSessionRow
 } from "./cloudMappers";
 
 export interface CloudRepository {
@@ -39,9 +39,8 @@ const asUnknownResult = <T>(
 export function createCloudRepository(rdb: CloudBaseRdbClient): CloudRepository {
   return {
     async loadCloudState(userId) {
-      const [profiles, userSettings, goals, records, timerSessions, achievements] = await Promise.all([
+      const [profiles, goals, records, timerSessions, achievements] = await Promise.all([
         rdb.from<ProfileRow>("profiles").select().eq("user_id", userId),
-        rdb.from<UserSettingsRow>("user_settings").select().eq("user_id", userId),
         rdb.from<GoalsRow>("goals").select().eq("user_id", userId),
         rdb.from<DailyRecordRow>("daily_records").select().eq("user_id", userId),
         rdb.from<TimerSessionRow>("timer_sessions").select().eq("user_id", userId),
@@ -49,19 +48,20 @@ export function createCloudRepository(rdb: CloudBaseRdbClient): CloudRepository 
       ]);
 
       const profileRows = assertResult("profiles", profiles);
-      const userSettingsRows = assertResult("user_settings", userSettings);
       const goalsRows = assertResult("goals", goals);
       const recordRows = assertResult("daily_records", records);
       const timerSessionRows = assertResult("timer_sessions", timerSessions);
       const achievementRows = assertResult("achievements", achievements);
+      const profile = profileRows[0] ?? null;
+      const goalsRow = goalsRows[0] ?? null;
 
-      if (profileRows.length === 0 || goalsRows.length === 0) return null;
+      if (!profile) return null;
+      if (profile?.status === "active" && !goalsRow) return null;
 
       return cloudRowsToAppState(
         {
-          profile: profileRows[0],
-          userSettings: userSettingsRows[0] ?? null,
-          goals: goalsRows[0],
+          profile,
+          goals: goalsRow,
           records: recordRows,
           timerSessions: timerSessionRows,
           achievements: achievementRows
@@ -73,18 +73,13 @@ export function createCloudRepository(rdb: CloudBaseRdbClient): CloudRepository 
     async saveCloudState(state, accountName) {
       const rows = appStateToCloudRows(state, accountName);
       const profile = requireMappedRow("profiles", rows.profile);
-      const userSettings = requireMappedRow("user_settings", rows.userSettings);
       const goals = requireMappedRow("goals", rows.goals);
 
       const writes: Array<{ tableName: string; result: Promise<CloudBaseRdbResult<unknown>> }> = [
         {
           tableName: "profiles",
-          result: asUnknownResult(rdb.from<ProfileRow>("profiles").upsert(profile, { onConflict: "user_id" }))
-        },
-        {
-          tableName: "user_settings",
           result: asUnknownResult(
-            rdb.from<UserSettingsRow>("user_settings").upsert(userSettings, { onConflict: "user_id" })
+            rdb.from<ProfileWriteRow>("profiles").upsert(profile, { onConflict: "user_id" })
           )
         },
         {
