@@ -69,11 +69,20 @@ describe("auth validation", () => {
 describe("createAuthService", () => {
   it("reads the current CloudBase session user", async () => {
     const client = fakeAuthClient({
-      getSession: vi.fn(async () => ({ data: { user }, error: null }))
+      getSession: vi.fn(async () => ({ data: { user, session: {} }, error: null }))
     });
     const service = createAuthService(client);
 
     await expect(service.getCurrentUser()).resolves.toEqual(user);
+  });
+
+  it("treats CloudBase users without a session as signed out", async () => {
+    const client = fakeAuthClient({
+      getSession: vi.fn(async () => ({ data: { user, session: null }, error: null }))
+    });
+    const service = createAuthService(client);
+
+    await expect(service.getCurrentUser()).resolves.toBeNull();
   });
 
   it("normalizes CloudBase SDK user.id to the app uid field", async () => {
@@ -88,7 +97,7 @@ describe("createAuthService", () => {
       }
     );
     const client = fakeAuthClient({
-      getSession: vi.fn(async () => ({ data: { user: sdkUserWithId }, error: null })),
+      getSession: vi.fn(async () => ({ data: { user: sdkUserWithId, session: {} }, error: null })),
       onAuthStateChange,
       signInWithPassword: vi.fn(async () => ({
         data: { user: sdkUserWithId, session: {} },

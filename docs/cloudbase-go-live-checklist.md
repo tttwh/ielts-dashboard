@@ -94,6 +94,7 @@ Use two throwaway accounts. Do not use your real personal password.
 | Case | Action | Expected result |
 | --- | --- | --- |
 | A register | Register account A with email verification | A can sign in and reaches synced/authenticated mode |
+| A session | Refresh after A signs in and inspect auth state | App remains authenticated only when CloudBase returns a real `data.session` |
 | A import | Create guest records before A signs in | A imports guest data into A cloud rows |
 | A refresh | Refresh after A syncs | A data restores |
 | A second session | Log into A in another browser profile | A cloud data loads |
@@ -103,6 +104,8 @@ Use two throwaway accounts. Do not use your real personal password.
 | Logout safety | Sign out | App returns to guest mode without deleting A or guest cache |
 
 Do not report real CloudBase verification as passed until each row has direct evidence: screenshot, console output, or SQL/RLS result.
+
+Do not treat a returned `user` object alone as proof of login. Cloud sync is valid only when CloudBase `getSession()` returns both a user and a non-empty session.
 
 ## 7. SQL Shape Checks
 

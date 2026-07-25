@@ -157,7 +157,11 @@ const requireUser = (user: CloudBaseRawAuthUser | null | undefined): CloudBaseAu
 export function createAuthService(authClient: CloudBaseAuthClient): AuthService {
   return {
     async getCurrentUser() {
-      return normalizeCloudBaseUser(assertCloudBaseOk(await authClient.getSession())?.user);
+      const data = assertCloudBaseOk(await authClient.getSession());
+      if (!data?.session) {
+        return null;
+      }
+      return normalizeCloudBaseUser(data.user);
     },
 
     async startEmailSignUp(credentials) {
