@@ -154,6 +154,19 @@ const requireUser = (user: CloudBaseRawAuthUser | null | undefined): CloudBaseAu
   return normalizedUser;
 };
 
+const requireAuthenticatedUser = (
+  data: CloudBaseAuthResponseData | null
+): CloudBaseAuthUser => {
+  if (!data?.session) {
+    throw new AuthError(
+      "authentication-failed",
+      "CloudBase did not return an authenticated session."
+    );
+  }
+
+  return requireUser(data.user);
+};
+
 export function createAuthService(authClient: CloudBaseAuthClient): AuthService {
   return {
     async getCurrentUser() {
@@ -208,7 +221,7 @@ export function createAuthService(authClient: CloudBaseAuthClient): AuthService 
           messageId: challenge.messageId ?? undefined
         })
       );
-      return requireUser(data?.user);
+      return requireAuthenticatedUser(data);
     },
 
     async signIn(credentials) {
@@ -229,7 +242,7 @@ export function createAuthService(authClient: CloudBaseAuthClient): AuthService 
           password: credentials.password
         })
       );
-      return requireUser(data?.user);
+      return requireAuthenticatedUser(data);
     },
 
     async signOut() {

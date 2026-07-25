@@ -162,6 +162,32 @@ describe("createAuthService", () => {
     await expect(service.completeEmailSignUp(challenge, "123456")).resolves.toEqual(user);
   });
 
+  it("rejects completed email registration when CloudBase omits the session", async () => {
+    const verifyOtp = vi.fn(async () => ({
+      data: { user, session: null },
+      error: null
+    }));
+    const client = fakeAuthClient({
+      signUp: vi.fn(async () => ({
+        data: {
+          messageId: "message-1",
+          verifyOtp
+        },
+        error: null
+      }))
+    });
+    const service = createAuthService(client);
+    const challenge = await service.startEmailSignUp({
+      email: "weihao@example.com",
+      username: "weihao_01",
+      password: "abc12345"
+    });
+
+    await expect(service.completeEmailSignUp(challenge, "123456")).rejects.toMatchObject({
+      code: "authentication-failed"
+    });
+  });
+
   it("signs in with email/password", async () => {
     const client = fakeAuthClient();
     const service = createAuthService(client);
@@ -181,6 +207,22 @@ describe("createAuthService", () => {
     expect(client.signInWithPassword).toHaveBeenCalledWith({
       username: "bad-email",
       password: "abc12345"
+    });
+  });
+
+  it("rejects password sign in when CloudBase omits the session", async () => {
+    const client = fakeAuthClient({
+      signInWithPassword: vi.fn(async () => ({
+        data: { user, session: null },
+        error: null
+      }))
+    });
+    const service = createAuthService(client);
+
+    await expect(
+      service.signIn({ account: "weihao@example.com", password: "abc12345" })
+    ).rejects.toMatchObject({
+      code: "authentication-failed"
     });
   });
 
