@@ -1,4 +1,5 @@
 import cloudbase from "@cloudbase/js-sdk";
+import { registerMySQL } from "@cloudbase/js-sdk/mysql";
 import type { CloudBaseClient, CloudBaseConfig } from "./cloudbaseTypes";
 
 const requiredValue = (name: string, value: string | undefined) => {
@@ -18,14 +19,20 @@ export function readCloudBaseConfig(env: ImportMetaEnv = import.meta.env): Cloud
 }
 
 export function createCloudBaseClient(config: CloudBaseConfig = readCloudBaseConfig()): CloudBaseClient {
+  registerMySQL(cloudbase);
+
   const sdkClient = cloudbase.init({
     env: config.envId,
     region: config.region,
     accessKey: config.accessKey
   }) as unknown as CloudBaseClient & { auth: CloudBaseClient["auth"] | (() => CloudBaseClient["auth"]) };
 
+  if (typeof sdkClient.rdb !== "function") {
+    throw new Error("CloudBase RDB client is unavailable. Check @cloudbase/js-sdk/mysql registration.");
+  }
+
   return {
-    ...sdkClient,
-    auth: typeof sdkClient.auth === "function" ? sdkClient.auth() : sdkClient.auth
+    auth: typeof sdkClient.auth === "function" ? sdkClient.auth() : sdkClient.auth,
+    rdb: sdkClient.rdb.bind(sdkClient)
   };
 }

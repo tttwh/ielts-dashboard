@@ -1,11 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const cloudbaseInit = vi.hoisted(() => vi.fn());
+const registerMySQL = vi.hoisted(() => vi.fn());
 
 vi.mock("@cloudbase/js-sdk", () => ({
   default: {
     init: cloudbaseInit
   }
+}));
+
+vi.mock("@cloudbase/js-sdk/mysql", () => ({
+  registerMySQL
 }));
 
 import { createCloudBaseClient, readCloudBaseConfig } from "./cloudbaseClient";
@@ -49,9 +54,10 @@ describe("readCloudBaseConfig", () => {
 describe("createCloudBaseClient", () => {
   beforeEach(() => {
     cloudbaseInit.mockReset();
+    registerMySQL.mockReset();
   });
 
-  it("initializes the CloudBase SDK with public client config", () => {
+  it("registers the CloudBase PG/RDB component before initializing the SDK", () => {
     const sdkClient = {
       auth: {},
       rdb: vi.fn()
@@ -69,8 +75,10 @@ describe("createCloudBaseClient", () => {
       region: "ap-shanghai",
       accessKey: "publishable-test-key"
     });
+    expect(registerMySQL).toHaveBeenCalledWith(expect.objectContaining({ init: cloudbaseInit }));
+    expect(registerMySQL).toHaveBeenCalledBefore(cloudbaseInit);
     expect(client.auth).toBe(sdkClient.auth);
-    expect(client.rdb).toBe(sdkClient.rdb);
+    expect(client.rdb()).toBe(sdkClient.rdb());
   });
 
   it("adapts SDK clients that expose auth as a function", () => {
@@ -91,5 +99,21 @@ describe("createCloudBaseClient", () => {
 
     expect(client.auth).toBe(authClient);
     expect(sdkClient.auth).toHaveBeenCalledOnce();
+  });
+
+  it("keeps SDK rdb methods defined on the client prototype", () => {
+    const rdbClient = {};
+    const sdkClient = Object.assign(Object.create({ rdb: vi.fn(() => rdbClient) }), {
+      auth: {}
+    });
+    cloudbaseInit.mockReturnValue(sdkClient);
+
+    const client = createCloudBaseClient({
+      envId: "test-env",
+      region: "ap-shanghai",
+      accessKey: "publishable-test-key"
+    });
+
+    expect(client.rdb()).toBe(rdbClient);
   });
 });
