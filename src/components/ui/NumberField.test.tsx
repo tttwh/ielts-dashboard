@@ -91,4 +91,22 @@ describe("NumberField", () => {
     expect(screen.getByLabelText("Corpus")).toHaveValue(30);
     expect(screen.getByText("min")).toBeVisible();
   });
+
+  it("uses compact visible styling for the numeric input", () => {
+    render(
+      <NumberField label="Words" max={999} min={0} onChange={() => undefined} step={10} value={120} />
+    );
+
+    const input = screen.getByLabelText("Words");
+
+    expect(input).toHaveClass(
+      "max-w-[9.5rem]",
+      "border-slate-300",
+      "bg-white",
+      "focus:border-ielts-blue",
+      "focus:ring-2",
+      "focus:ring-blue-200"
+    );
+    expect(input).not.toHaveClass("bg-transparent");
+  });
 });

@@ -54,7 +54,11 @@ describe("AuthPanel", () => {
     );
 
     expect(props.onSignIn).not.toHaveBeenCalled();
-    expect(screen.getByText("Use a valid email or a 5-24 character username.")).toBeVisible();
+    expect(
+      screen.getByText(
+        "Use a valid email or a 6-25 lowercase username that starts with a letter and uses only numbers, underscores, or hyphens after that."
+      )
+    ).toBeVisible();
     expect(screen.getByText("Password must be 8-32 characters and include letters and numbers.")).toBeVisible();
   });
 
@@ -71,6 +75,23 @@ describe("AuthPanel", () => {
 
     expect(props.onSignIn).toHaveBeenCalledWith({
       account: "weihao_02",
+      password: "Password123"
+    });
+  });
+
+  it("lowercases username sign-in accounts before submit", async () => {
+    const { props, user } = renderAuthPanel();
+
+    await user.type(screen.getByLabelText("Account"), "Jonathon");
+    await user.type(screen.getByLabelText("Password"), "Password123");
+    await user.click(
+      within(screen.getByRole("form", { name: "Sign in" })).getByRole("button", {
+        name: "Sign in"
+      })
+    );
+
+    expect(props.onSignIn).toHaveBeenCalledWith({
+      account: "jonathon",
       password: "Password123"
     });
   });
@@ -106,7 +127,9 @@ describe("AuthPanel", () => {
     expect(props.onStartEmailSignUp).not.toHaveBeenCalled();
     expect(screen.getByText("Enter a valid email address.")).toBeVisible();
     expect(
-      screen.getByText("Username must be 5-24 characters and may use letters, numbers, underscores, or hyphens.")
+      screen.getByText(
+        "Username is optional. If filled, use 6-25 lowercase characters, start with a letter, and use only numbers, underscores, or hyphens after that."
+      )
     ).toBeVisible();
     expect(screen.getByText("Password must be 8-32 characters and include letters and numbers.")).toBeVisible();
   });
@@ -124,6 +147,26 @@ describe("AuthPanel", () => {
       email: "weihao@example.com",
       password: "Password123",
       username: "weihao_01"
+    });
+  });
+
+  it("lowercases sign-up username while typing and before submit", async () => {
+    const { props, user } = renderAuthPanel();
+
+    await user.click(screen.getByRole("button", { name: "Sign up" }));
+    await user.type(screen.getByLabelText("Email"), "weihao@example.com");
+    const usernameInput = screen.getByLabelText("Username");
+    await user.type(usernameInput, "Jonathon");
+    await user.type(screen.getByLabelText("Password"), "Password123");
+
+    expect(usernameInput).toHaveValue("jonathon");
+
+    await user.click(screen.getByRole("button", { name: "Send verification code" }));
+
+    expect(props.onStartEmailSignUp).toHaveBeenCalledWith({
+      email: "weihao@example.com",
+      password: "Password123",
+      username: "jonathon"
     });
   });
 

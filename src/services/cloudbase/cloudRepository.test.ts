@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createDefaultAppState } from "../../domain/defaults";
 import type { AppState } from "../storage/storageTypes";
 import { appStateToCloudRows } from "./cloudMappers";
@@ -7,6 +7,8 @@ import type { CloudBaseRdbClient, CloudBaseRdbResult } from "./cloudbaseTypes";
 
 type FakeTableData = Record<string, unknown[] | unknown | null>;
 type FakeTableErrors = Record<string, string>;
+type RdbOutcome<T = unknown> = CloudBaseRdbResult<T> | Error;
+type TableOutcomes = Record<string, RdbOutcome[]>;
 
 interface UpsertCall {
   tableName: string;
@@ -16,6 +18,10 @@ interface UpsertCall {
 
 const now = "2026-07-24T00:00:00.000Z";
 const updatedAt = "2026-07-24T01:00:00.000Z";
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 const createFilledState = (): AppState => {
   const state = createDefaultAppState(now);
@@ -151,6 +157,91 @@ const createFakeRdb = ({
   };
 
   return { calls, rdb, upserts };
+};
+
+const nextOutcome = <T>(
+  tableName: string,
+  outcomes: TableOutcomes,
+  fallback: CloudBaseRdbResult<T>
+): CloudBaseRdbResult<T> | Error => {
+  const tableOutcomes = outcomes[tableName];
+  return (tableOutcomes?.shift() as CloudBaseRdbResult<T> | Error | undefined) ?? fallback;
+};
+
+const resolveOutcome = async <T>(outcome: CloudBaseRdbResult<T> | Error): Promise<CloudBaseRdbResult<T>> => {
+  if (outcome instanceof Error) {
+    throw outcome;
+  }
+
+  return outcome;
+};
+
+const createSequencedFakeRdb = ({
+  selectData = {},
+  selectOutcomes = {},
+  upsertOutcomes = {}
+}: {
+  selectData?: FakeTableData;
+  selectOutcomes?: TableOutcomes;
+  upsertOutcomes?: TableOutcomes;
+} = {}) => {
+  const calls: string[] = [];
+  const upserts: UpsertCall[] = [];
+
+  const rdb: CloudBaseRdbClient = {
+    from: <T>(tableName: string) => ({
+      select: () => {
+        calls.push(`${tableName}.select()`);
+
+        return {
+          eq: async (column: string, value: unknown): Promise<CloudBaseRdbResult<T>> => {
+            calls.push(`${tableName}.eq(${column},${String(value)})`);
+
+            return resolveOutcome(
+              nextOutcome(tableName, selectOutcomes, {
+                data: (selectData[tableName] ?? []) as T[] | T | null,
+                error: null
+              })
+            );
+          }
+        };
+      },
+      upsert: async (values: T | T[], options?: { onConflict?: string }): Promise<CloudBaseRdbResult<T>> => {
+        calls.push(`${tableName}.upsert(${options?.onConflict ?? ""})`);
+        upserts.push({
+          tableName,
+          values,
+          onConflict: options?.onConflict
+        });
+
+        return resolveOutcome(
+          nextOutcome(tableName, upsertOutcomes, {
+            data: [],
+            error: null
+          })
+        );
+      }
+    })
+  };
+
+  return { calls, rdb, upserts };
+};
+
+const createDeferred = <T>() => {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((innerResolve, innerReject) => {
+    resolve = innerResolve;
+    reject = innerReject;
+  });
+
+  return { promise, reject, resolve };
+};
+
+const flushPromises = async () => {
+  for (let index = 0; index < 50; index += 1) {
+    await Promise.resolve();
+  }
 };
 
 const keyColumnsFor = (options?: { onConflict?: string }) =>
@@ -294,6 +385,75 @@ describe("createCloudRepository", () => {
     }
   });
 
+  it("reads cloud tables sequentially instead of starting all select promises together", async () => {
+    const calls: string[] = [];
+    const selectData = createCloudSelectData();
+    const deferreds: Record<string, ReturnType<typeof createDeferred<CloudBaseRdbResult<unknown>>>> = {};
+    const rdb: CloudBaseRdbClient = {
+      from: <T>(tableName: string) => ({
+        select: () => {
+          calls.push(`${tableName}.select()`);
+
+          return {
+            eq: (column: string, value: unknown): Promise<CloudBaseRdbResult<T>> => {
+              calls.push(`${tableName}.eq(${column},${String(value)})`);
+              const deferred = createDeferred<CloudBaseRdbResult<unknown>>();
+              deferreds[tableName] = deferred;
+
+              return deferred.promise as Promise<CloudBaseRdbResult<T>>;
+            }
+          };
+        },
+        upsert: async (): Promise<CloudBaseRdbResult<T>> => ({
+          data: [],
+          error: null
+        })
+      })
+    };
+    const repository = createCloudRepository(rdb);
+
+    const loadPromise = repository.loadCloudState("cloud-user-1");
+    await flushPromises();
+
+    expect(calls).toEqual(["profiles.select()", "profiles.eq(user_id,cloud-user-1)"]);
+
+    for (const tableName of [
+      "profiles",
+      "goals",
+      "daily_records",
+      "timer_sessions",
+      "achievements"
+    ]) {
+      deferreds[tableName].resolve({
+        data: selectData[tableName],
+        error: null
+      });
+      await flushPromises();
+
+      const nextTableName = {
+        profiles: "goals",
+        goals: "daily_records",
+        daily_records: "timer_sessions",
+        timer_sessions: "achievements",
+        achievements: null
+      }[tableName];
+
+      if (nextTableName) {
+        expect(calls).toContain(`${nextTableName}.select()`);
+        expect(calls.indexOf(`${tableName}.eq(user_id,cloud-user-1)`)).toBeLessThan(
+          calls.indexOf(`${nextTableName}.select()`)
+        );
+      }
+    }
+
+    await expect(loadPromise).resolves.toMatchObject({
+      profile: {
+        userId: "cloud-user-1",
+        syncStatus: "synced"
+      }
+    });
+  });
+
   it.each([
     ["profiles", { profiles: [] }],
     ["active profile goals", { goals: [] }]
@@ -356,6 +516,156 @@ describe("createCloudRepository", () => {
     expect(state?.achievements).toHaveLength(1);
   });
 
+  it("retries transient result errors with 500ms, 1200ms, and 2500ms delays before succeeding", async () => {
+    vi.useFakeTimers();
+    const selectData = createCloudSelectData();
+    const transientResult: CloudBaseRdbResult<unknown> = {
+      data: null,
+      error: {
+        code: "DATABASE_PGRST002",
+        message: "Could not find table in schema cache"
+      }
+    };
+    const { calls, rdb } = createSequencedFakeRdb({
+      selectData,
+      selectOutcomes: {
+        profiles: [
+          transientResult,
+          transientResult,
+          transientResult,
+          {
+            data: selectData.profiles,
+            error: null
+          }
+        ]
+      }
+    });
+    const repository = createCloudRepository(rdb);
+
+    const loadPromise = repository.loadCloudState("cloud-user-1");
+    await flushPromises();
+
+    expect(calls.filter((call) => call === "profiles.eq(user_id,cloud-user-1)")).toHaveLength(1);
+
+    await vi.advanceTimersByTimeAsync(499);
+    await flushPromises();
+    expect(calls.filter((call) => call === "profiles.eq(user_id,cloud-user-1)")).toHaveLength(1);
+
+    await vi.advanceTimersByTimeAsync(1);
+    await flushPromises();
+    expect(calls.filter((call) => call === "profiles.eq(user_id,cloud-user-1)")).toHaveLength(2);
+
+    await vi.advanceTimersByTimeAsync(1199);
+    await flushPromises();
+    expect(calls.filter((call) => call === "profiles.eq(user_id,cloud-user-1)")).toHaveLength(2);
+
+    await vi.advanceTimersByTimeAsync(1);
+    await flushPromises();
+    expect(calls.filter((call) => call === "profiles.eq(user_id,cloud-user-1)")).toHaveLength(3);
+
+    await vi.advanceTimersByTimeAsync(2499);
+    await flushPromises();
+    expect(calls.filter((call) => call === "profiles.eq(user_id,cloud-user-1)")).toHaveLength(3);
+
+    await vi.advanceTimersByTimeAsync(1);
+
+    await expect(loadPromise).resolves.toMatchObject({
+      profile: {
+        userId: "cloud-user-1",
+        syncStatus: "synced"
+      }
+    });
+    expect(calls.filter((call) => call === "profiles.select()")).toHaveLength(4);
+  });
+
+  it("retries thrown transient errors and recreates the read query before succeeding", async () => {
+    vi.useFakeTimers();
+    const selectData = createCloudSelectData();
+    const transientError = Object.assign(new Error("HTTP 503 Service Unavailable"), { status: 503 });
+    const { calls, rdb } = createSequencedFakeRdb({
+      selectData,
+      selectOutcomes: {
+        timer_sessions: [
+          transientError,
+          {
+            data: selectData.timer_sessions,
+            error: null
+          }
+        ]
+      }
+    });
+    const repository = createCloudRepository(rdb);
+
+    const loadPromise = repository.loadCloudState("cloud-user-1");
+    await flushPromises();
+
+    expect(calls.filter((call) => call === "timer_sessions.eq(user_id,cloud-user-1)")).toHaveLength(1);
+
+    await vi.advanceTimersByTimeAsync(500);
+
+    await expect(loadPromise).resolves.toMatchObject({
+      timerSessions: expect.arrayContaining([
+        expect.objectContaining({
+          sessionId: "session-2026-07-24-reading"
+        })
+      ])
+    });
+    expect(calls.filter((call) => call === "timer_sessions.select()")).toHaveLength(2);
+  });
+
+  it("does not retry permanent result errors or start later reads", async () => {
+    const { calls, rdb } = createSequencedFakeRdb({
+      selectData: createCloudSelectData(),
+      selectOutcomes: {
+        goals: [
+          {
+            data: null,
+            error: {
+              code: "42501",
+              message: "permission denied"
+            }
+          }
+        ]
+      }
+    });
+    const repository = createCloudRepository(rdb);
+
+    await expect(repository.loadCloudState("cloud-user-1")).rejects.toThrow("goals: permission denied");
+    expect(calls.filter((call) => call === "goals.eq(user_id,cloud-user-1)")).toHaveLength(1);
+    expect(calls).not.toContain("daily_records.select()");
+  });
+
+  it("preserves CloudBase result error metadata after transient retries are exhausted", async () => {
+    vi.useFakeTimers();
+    const transientResult: CloudBaseRdbResult<unknown> = {
+      data: null,
+      error: {
+        code: "DATABASE_PGRST002",
+        message: "database API temporarily unavailable",
+        status: 503
+      }
+    };
+    const { rdb } = createSequencedFakeRdb({
+      selectOutcomes: {
+        profiles: [transientResult, transientResult, transientResult, transientResult]
+      }
+    });
+    const repository = createCloudRepository(rdb);
+
+    const loadPromise = repository.loadCloudState("cloud-user-1");
+    const rejection = expect(loadPromise).rejects.toMatchObject({
+      code: "DATABASE_PGRST002",
+      status: 503,
+      message: "profiles: database API temporarily unavailable"
+    });
+    await flushPromises();
+    await vi.advanceTimersByTimeAsync(500);
+    await vi.advanceTimersByTimeAsync(1200);
+    await vi.advanceTimersByTimeAsync(2500);
+
+    await rejection;
+  });
+
   it("upserts all cloud rows with conflict targets", async () => {
     const state = createFilledState();
     const rows = appStateToCloudRows(state, "weihao_01");
@@ -390,6 +700,94 @@ describe("createCloudRepository", () => {
         values: rows.achievements,
         onConflict: "user_id,achievement_id"
       }
+    ]);
+  });
+
+  it("runs save writes sequentially and retries transient failures with a recreated query", async () => {
+    vi.useFakeTimers();
+    const state = createFilledState();
+    const calls: string[] = [];
+    const upserts: UpsertCall[] = [];
+    const profileDeferred = createDeferred<CloudBaseRdbResult<unknown>>();
+    let goalsAttempts = 0;
+    const rdb: CloudBaseRdbClient = {
+      from: <T>(tableName: string) => ({
+        select: () => ({
+          eq: async (): Promise<CloudBaseRdbResult<T>> => ({
+            data: [],
+            error: null
+          })
+        }),
+        upsert: (values: T | T[], options?: { onConflict?: string }): Promise<CloudBaseRdbResult<T>> => {
+          calls.push(`${tableName}.upsert(${options?.onConflict ?? ""})`);
+          upserts.push({
+            tableName,
+            values,
+            onConflict: options?.onConflict
+          });
+
+          if (tableName === "profiles") {
+            return profileDeferred.promise as Promise<CloudBaseRdbResult<T>>;
+          }
+
+          if (tableName === "goals") {
+            goalsAttempts += 1;
+
+            if (goalsAttempts === 1) {
+              return Promise.resolve({
+                data: null,
+                error: {
+                  code: "DATABASE_PGRST002",
+                  message: "schema cache reload in progress"
+                }
+              });
+            }
+          }
+
+          return Promise.resolve({
+            data: [],
+            error: null
+          });
+        }
+      })
+    };
+    const repository = createCloudRepository(rdb);
+
+    const savePromise = repository.saveCloudState(state, "weihao_01");
+    await flushPromises();
+
+    expect(calls).toEqual(["profiles.upsert(user_id)"]);
+
+    profileDeferred.resolve({
+      data: [],
+      error: null
+    });
+    await flushPromises();
+
+    expect(calls).toEqual(["profiles.upsert(user_id)", "goals.upsert(user_id)"]);
+
+    await vi.advanceTimersByTimeAsync(499);
+    await flushPromises();
+    expect(calls).toEqual(["profiles.upsert(user_id)", "goals.upsert(user_id)"]);
+
+    await vi.advanceTimersByTimeAsync(1);
+
+    await expect(savePromise).resolves.toBeUndefined();
+    expect(calls).toEqual([
+      "profiles.upsert(user_id)",
+      "goals.upsert(user_id)",
+      "goals.upsert(user_id)",
+      "daily_records.upsert(user_id,record_id)",
+      "timer_sessions.upsert(user_id,session_id)",
+      "achievements.upsert(user_id,achievement_id)"
+    ]);
+    expect(upserts.map((upsert) => upsert.tableName)).toEqual([
+      "profiles",
+      "goals",
+      "goals",
+      "daily_records",
+      "timer_sessions",
+      "achievements"
     ]);
   });
 

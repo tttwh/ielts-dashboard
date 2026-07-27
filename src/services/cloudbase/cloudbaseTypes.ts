@@ -48,7 +48,7 @@ export interface CloudBaseAuthClient {
 
 export interface CloudBaseRdbResult<T> {
   data: T[] | T | null;
-  error: { message?: string; code?: string } | null;
+  error: { message?: string; code?: string; status?: number | string; statusCode?: number | string } | null;
 }
 
 export interface CloudBaseRdbFilterQuery<T> {

@@ -167,7 +167,8 @@ describe("App", () => {
 
     expect(screen.queryByText("Study time targets pending")).not.toBeInTheDocument();
     expect(within(screen.getByTestId("daily-checkin")).getByText("All Clear")).toBeVisible();
-    expect(screen.getByText("120 XP")).toHaveClass("font-mono");
+    openView("Overview");
+    expect(within(screen.getByTestId("summary-header")).getByText("120 XP")).toHaveClass("font-mono");
 
     openView("Rewards");
 

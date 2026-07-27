@@ -1,4 +1,8 @@
 import { useEffect, useId, useState } from "react";
+import {
+  numberFieldInputBaseClassName,
+  numberFieldSuffixClassName
+} from "./inputStyles";
 
 export interface NumberFieldProps {
   label: string;
@@ -107,17 +111,21 @@ export function NumberField({
     }
   };
 
+  const inputClassName = `${numberFieldInputBaseClassName} ${
+    suffix ? "rounded-l-[6px] rounded-r-none border-r-0 focus:z-10" : "rounded-[6px]"
+  }`;
+
   return (
-    <div className="min-w-0">
+    <div className="min-w-0 max-w-[9.5rem]">
       <label
         className="block truncate text-xs font-medium uppercase tracking-normal text-muted"
         htmlFor={id}
       >
         {label}
       </label>
-      <div className="mt-1 flex min-w-0 items-center rounded-[6px] border border-white/75 bg-white/70 shadow-[0_1px_0_rgba(255,255,255,0.78)_inset] backdrop-blur focus-within:border-ielts-blue focus-within:ring-2 focus-within:ring-blue-100">
+      <div className="mt-1 flex w-full max-w-[9.5rem] min-w-0 items-center rounded-[6px]">
         <input
-          className="h-9 min-w-0 flex-1 rounded-[6px] border-0 bg-transparent px-2 font-mono text-sm font-semibold text-ink outline-none"
+          className={inputClassName}
           id={id}
           inputMode={step < 1 ? "decimal" : "numeric"}
           max={max}
@@ -130,7 +138,7 @@ export function NumberField({
           value={draftValue}
         />
         {suffix ? (
-          <span aria-hidden="true" className="shrink-0 border-l border-blue-100/80 px-2 text-xs font-medium text-muted">
+          <span aria-hidden="true" className={numberFieldSuffixClassName}>
             {suffix}
           </span>
         ) : null}

@@ -9,11 +9,17 @@ declare const process: {
   };
 };
 
-const e2eCloudBaseFakePath = `${process.cwd().replace(/\\/g, "/")}/tests/e2e/fakes/cloudbase-js-sdk.ts`;
+const e2eRoot = `${process.cwd().replace(/\\/g, "/")}/tests/e2e/fakes`;
+const e2eCloudBaseFakePath = `${e2eRoot}/cloudbase-js-sdk.ts`;
+const e2eCloudBaseMySQLFakePath = `${e2eRoot}/cloudbase-js-sdk-mysql.ts`;
 
 const e2eCloudBaseAlias =
   process.env.VITE_E2E_FAKE_CLOUDBASE === "true"
     ? [
+        {
+          find: "@cloudbase/js-sdk/mysql",
+          replacement: e2eCloudBaseMySQLFakePath
+        },
         {
           find: "@cloudbase/js-sdk",
           replacement: e2eCloudBaseFakePath

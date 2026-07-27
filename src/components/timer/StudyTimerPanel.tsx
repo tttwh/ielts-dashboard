@@ -6,6 +6,7 @@ import type { DailyGoals, IeltsSection, TimerSession } from "../../domain/types"
 import { useStudyTimer } from "../../hooks/useStudyTimer";
 import { useI18n } from "../../i18n/I18nProvider";
 import { Button } from "../ui/Button";
+import { selectInputClassName, timerMinuteInputClassName } from "../ui/inputStyles";
 
 interface StudyTimerPanelProps {
   dailyGoals: DailyGoals;
@@ -243,7 +244,7 @@ export function StudyTimerPanel({
                 {t.timer.manualSection}
               </span>
               <select
-                className="mt-1 h-10 w-full min-w-0 rounded-[6px] border border-white/75 bg-white/70 px-2 text-sm font-semibold text-ink outline-none shadow-[0_1px_0_rgba(255,255,255,0.78)_inset] backdrop-blur focus:border-ielts-blue focus:ring-2 focus:ring-blue-100"
+                className={selectInputClassName}
                 onChange={(event) => setManualSection(event.currentTarget.value as IeltsSection)}
                 value={manualSection}
               >
@@ -255,12 +256,12 @@ export function StudyTimerPanel({
               </select>
             </label>
 
-            <label className="min-w-0">
+            <label className="min-w-0 max-w-[7rem]">
               <span className="block truncate text-xs font-medium uppercase tracking-normal text-muted">
                 {t.timer.manualMinutes}
               </span>
               <input
-                className="mt-1 h-10 w-full min-w-0 rounded-[6px] border border-white/75 bg-white/70 px-2 font-mono text-sm font-semibold text-ink outline-none shadow-[0_1px_0_rgba(255,255,255,0.78)_inset] backdrop-blur focus:border-ielts-blue focus:ring-2 focus:ring-blue-100"
+                className={timerMinuteInputClassName}
                 inputMode="numeric"
                 max={1440}
                 min={1}

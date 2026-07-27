@@ -314,10 +314,11 @@ export const translations: Record<Language, I18nText> = {
         "verification-unavailable": "Email verification is unavailable. Try again later."
       },
       validation: {
-        accountHelp: "Use a valid email or a 5-24 character username.",
+        accountHelp:
+          "Use a valid email or a 6-25 lowercase username that starts with a letter and uses only numbers, underscores, or hyphens after that.",
         emailHelp: "Enter a valid email address.",
         usernameHelp:
-          "Username must be 5-24 characters and may use letters, numbers, underscores, or hyphens.",
+          "Username is optional. If filled, use 6-25 lowercase characters, start with a letter, and use only numbers, underscores, or hyphens after that.",
         passwordHelp: "Password must be 8-32 characters and include letters and numbers.",
         codeHelp: "Enter the 6-digit verification code."
       }
@@ -332,7 +333,9 @@ export const translations: Record<Language, I18nText> = {
       messages: {
         "account-disabled": "This account is disabled. Cloud sync is blocked.",
         "account-pending": "This account is pending review. Cloud sync is blocked.",
-        "foreign-cloud-cache": "Another account's local cache was detected. Import was stopped."
+        "foreign-cloud-cache": "Another account's local cache was detected. Import was stopped.",
+        "cloudbase-api-unavailable":
+          "CloudBase data API is temporarily unavailable. Refresh or sign in again shortly."
       }
     },
     checkIn: {
@@ -508,9 +511,11 @@ export const translations: Record<Language, I18nText> = {
         "verification-unavailable": "验证码服务暂不可用，请稍后再试。"
       },
       validation: {
-        accountHelp: "请输入有效邮箱，或 5-24 位用户名。",
+        accountHelp:
+          "请输入有效邮箱，或 6-25 位小写用户名：以字母开头，后续只能使用数字、下划线或连字符。",
         emailHelp: "请输入有效邮箱地址。",
-        usernameHelp: "用户名需为 5-24 位，可使用字母、数字、下划线或连字符。",
+        usernameHelp:
+          "用户名可不填；如填写，需为 6-25 位小写字符，以字母开头，后续只能使用数字、下划线或连字符。",
         passwordHelp: "密码需为 8-32 位，并同时包含字母和数字。",
         codeHelp: "请输入 6 位数字验证码。"
       }
@@ -525,7 +530,8 @@ export const translations: Record<Language, I18nText> = {
       messages: {
         "account-disabled": "账号已停用，云同步已阻断。",
         "account-pending": "账号待审核，云同步已阻断。",
-        "foreign-cloud-cache": "检测到其他账号的本地缓存，已停止导入。"
+        "foreign-cloud-cache": "检测到其他账号的本地缓存，已停止导入。",
+        "cloudbase-api-unavailable": "CloudBase 数据接口暂时不可用，请稍后刷新或重新登录。"
       }
     },
     checkIn: {

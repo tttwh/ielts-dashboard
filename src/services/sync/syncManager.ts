@@ -23,15 +23,6 @@ const synced = (state: AppState): SyncResult => ({
   }
 });
 
-const failed = (state: AppState, error: unknown): SyncResult => ({
-  state,
-  syncState: {
-    mode: "error",
-    message: error instanceof Error ? error.message : String(error),
-    lastSyncedAt: null
-  }
-});
-
 const failedWithCode = (state: AppState, code: SyncErrorCode): SyncResult => ({
   state,
   syncState: {
@@ -41,6 +32,22 @@ const failedWithCode = (state: AppState, code: SyncErrorCode): SyncResult => ({
     lastSyncedAt: null
   }
 });
+
+const failed = (state: AppState, error: unknown): SyncResult => {
+  const code = classifySyncError(error);
+  if (code) {
+    return failedWithCode(state, code);
+  }
+
+  return {
+    state,
+    syncState: {
+      mode: "error",
+      message: error instanceof Error ? error.message : String(error),
+      lastSyncedAt: null
+    }
+  };
+};
 
 const LOCAL_GUEST_USER_ID = "local-user";
 
@@ -56,6 +63,41 @@ const blockedAccountSync = (
   state: AppState,
   status: NonNullable<AppState["profile"]["accountStatus"]>
 ): SyncResult => failedWithCode(state, status === "disabled" ? "account-disabled" : "account-pending");
+
+const hasStatus503 = (error: unknown): boolean => {
+  if (!error || typeof error !== "object") return false;
+
+  const status = "status" in error ? error.status : undefined;
+  const statusCode = "statusCode" in error ? error.statusCode : undefined;
+
+  return status === 503 || status === "503" || statusCode === 503 || statusCode === "503";
+};
+
+const hasDatabaseSchemaCacheCode = (error: unknown): boolean => {
+  if (!error || typeof error !== "object") return false;
+
+  const code = "code" in error ? error.code : undefined;
+
+  return code === "DATABASE_PGRST002";
+};
+
+const classifySyncError = (error: unknown): SyncErrorCode | null => {
+  const message = error instanceof Error ? error.message : String(error);
+  const normalizedMessage = message.toLowerCase();
+
+  if (
+    message.includes("DATABASE_PGRST002") ||
+    hasDatabaseSchemaCacheCode(error) ||
+    normalizedMessage.includes("schema cache") ||
+    normalizedMessage.includes("status 503") ||
+    normalizedMessage.includes("http 503") ||
+    hasStatus503(error)
+  ) {
+    return "cloudbase-api-unavailable";
+  }
+
+  return null;
+};
 
 const newerByUpdatedAt = <T extends { updatedAt: string }>(localItem: T, cloudItem: T): T =>
   localItem.updatedAt > cloudItem.updatedAt ? localItem : cloudItem;

@@ -41,17 +41,18 @@ test("dashboard shell loads without horizontal overflow", async ({ page }, testI
   await expect(page.getByRole("progressbar", { name: "Today completion" })).toBeVisible();
   await expect(page.getByTestId("page-overview")).toBeVisible();
 
-  await openView(page, "Progress");
-  await expect(page.getByRole("heading", { name: "History Summary" })).toBeVisible();
-  await expect(page.getByTestId("history-heatmap").getByRole("button")).toHaveCount(60);
-  await expectNoHorizontalOverflow(page);
-
   const summaryFitsViewport = await page.getByTestId("summary-header").evaluate((element) => {
     const box = element.getBoundingClientRect();
     return box.left >= 0 && box.right <= window.innerWidth;
   });
 
   expect(summaryFitsViewport).toBeTruthy();
+
+  await openView(page, "Progress");
+  await expect(page.getByRole("heading", { name: "History Summary" })).toBeVisible();
+  await expect(page.getByTestId("history-heatmap").getByRole("button")).toHaveCount(60);
+  await expectNoHorizontalOverflow(page);
+  await expect(page.getByTestId("summary-header")).toHaveCount(0);
 });
 
 test("guest mode allows check-in, timer, settings, and language toggle", async ({
@@ -80,9 +81,10 @@ test("guest mode allows check-in, timer, settings, and language toggle", async (
   await expect(page.getByText("CloudBase mode")).toBeVisible();
   await page.getByTestId("page-settings").getByRole("button", { name: "中" }).click();
 
-  await expect(page.getByRole("heading", { name: "雅思备考打卡看板" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "设置" })).toBeVisible();
   await expect(page.getByRole("link", { name: "打卡" })).toBeVisible();
+  await openView(page, "总览");
+  await expect(page.getByRole("heading", { name: "雅思备考打卡看板" })).toBeVisible();
   await expectNoHorizontalOverflow(page);
 });
 
@@ -188,6 +190,7 @@ test("daily check-in reaches all clear without desktop or mobile overflow", asyn
   await expect(checkIn.getByLabel("Speaking topics complete")).toBeVisible();
   await expect(checkIn.getByLabel("Listening tests complete")).toBeVisible();
   await expect(checkIn.getByLabel("Corpus minutes complete")).toBeVisible();
+  await openView(page, "Overview");
   await expect(page.getByRole("progressbar", { name: "Today completion" })).toHaveAttribute(
     "aria-valuenow",
     "100"

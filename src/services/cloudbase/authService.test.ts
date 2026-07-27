@@ -49,14 +49,19 @@ describe("auth validation", () => {
 
   it("accepts optional CloudBase-compatible usernames", () => {
     expect(validateUsername("")).toBeNull();
+    expect(validateUsername("jonathon")).toBeNull();
     expect(validateUsername("weihao_01")).toBeNull();
     expect(validateUsername("ielts-user")).toBeNull();
   });
 
   it("rejects unsafe usernames", () => {
-    expect(validateUsername("123456")).toBe("Username cannot be all numbers.");
-    expect(validateUsername("-weihao")).toBe("Username must start with a letter or number.");
-    expect(validateUsername("ab")).toBe("Username must be 5-24 characters.");
+    const usernameHelp =
+      "Username is optional. If filled, use 6-25 lowercase characters, start with a letter, and use only numbers, underscores, or hyphens after that.";
+
+    expect(validateUsername("1abcde")).toBe(usernameHelp);
+    expect(validateUsername("abcde")).toBe(usernameHelp);
+    expect(validateUsername("abcdefghijklmnopqrstuvwxyz")).toBe(usernameHelp);
+    expect(validateUsername("-weihao")).toBe(usernameHelp);
   });
 
   it("requires password length and mixed character classes", () => {
@@ -150,6 +155,23 @@ describe("createAuthService", () => {
     });
   });
 
+  it("normalizes registration usernames before validating and submitting", async () => {
+    const client = fakeAuthClient();
+    const service = createAuthService(client);
+
+    await service.startEmailSignUp({
+      email: "weihao@example.com",
+      username: " Jonathon ",
+      password: "abc12345"
+    });
+
+    expect(client.signUp).toHaveBeenCalledWith({
+      email: "weihao@example.com",
+      username: "jonathon",
+      password: "abc12345"
+    });
+  });
+
   it("completes email registration with verification code", async () => {
     const client = fakeAuthClient();
     const service = createAuthService(client);
@@ -192,9 +214,9 @@ describe("createAuthService", () => {
     const client = fakeAuthClient();
     const service = createAuthService(client);
 
-    await service.signIn({ account: "weihao@example.com", password: "abc12345" });
+    await service.signIn({ account: " WeiHao@Example.COM ", password: "abc12345" });
     expect(client.signInWithPassword).toHaveBeenCalledWith({
-      email: "weihao@example.com",
+      email: "WeiHao@Example.COM",
       password: "abc12345"
     });
   });
@@ -203,9 +225,9 @@ describe("createAuthService", () => {
     const client = fakeAuthClient();
     const service = createAuthService(client);
 
-    await service.signIn({ account: "bad-email", password: "abc12345" });
+    await service.signIn({ account: " Jonathon ", password: "abc12345" });
     expect(client.signInWithPassword).toHaveBeenCalledWith({
-      username: "bad-email",
+      username: "jonathon",
       password: "abc12345"
     });
   });

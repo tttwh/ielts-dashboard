@@ -5,6 +5,7 @@ import type { DailyGoals, UserProfile } from "../domain/types";
 import type { DailyGoalsUpdate, ProfileUpdate } from "../hooks/useDashboardData";
 import { useI18n } from "../i18n/I18nProvider";
 import type { SyncState } from "../services/sync/syncTypes";
+import { syncLabel, syncMessage } from "../services/sync/syncDisplay";
 
 interface SettingsPageProps {
   cloudbaseConfigured: boolean;
@@ -14,22 +15,6 @@ interface SettingsPageProps {
   updateDailyGoals(update: DailyGoalsUpdate): void;
   updateProfile(update: ProfileUpdate): void;
 }
-
-const syncLabel = (t: ReturnType<typeof useI18n>["t"], syncState: SyncState) => {
-  switch (syncState.mode) {
-    case "syncing":
-      return t.sync.syncing;
-    case "synced":
-      return t.sync.synced;
-    case "offline":
-      return t.sync.offline;
-    case "error":
-      return t.sync.error;
-    case "guest":
-    default:
-      return t.sync.guest;
-  }
-};
 
 export function SettingsPage({
   cloudbaseConfigured,
@@ -45,6 +30,7 @@ export function SettingsPage({
     ? t.settings.cloudConfigured
     : t.settings.cloudLocalOnly;
   const currentSyncLabel = syncLabel(t, syncState);
+  const currentSyncMessage = syncMessage(t, syncState);
 
   return (
     <div className="page-stack">
@@ -87,9 +73,9 @@ export function SettingsPage({
           <span className="min-w-0 break-words text-ielts-purple sm:col-span-2">
             {cloudbaseStatusCopy}
           </span>
-          {syncState.message ? (
+          {currentSyncMessage ? (
             <span className="min-w-0 break-words text-muted sm:col-span-2">
-              {syncState.message}
+              {currentSyncMessage}
             </span>
           ) : null}
         </div>

@@ -90,12 +90,18 @@ export function validateEmail(email: string): string | null {
   return null;
 }
 
+const usernameValidationMessage =
+  "Username is optional. If filled, use 6-25 lowercase characters, start with a letter, and use only numbers, underscores, or hyphens after that.";
+
+const cloudBaseUsernamePattern = /^$|^[a-z][0-9a-z_-]{5,24}$/;
+
+export function normalizeUsername(username: string): string {
+  return username.trim().toLowerCase();
+}
+
 export function validateUsername(username: string): string | null {
-  const value = username.trim();
-  if (!value) return null;
-  if (value.length < 5 || value.length > 24) return "Username must be 5-24 characters.";
-  if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(value)) return "Username must start with a letter or number.";
-  if (/^\d+$/.test(value)) return "Username cannot be all numbers.";
+  const value = normalizeUsername(username);
+  if (!cloudBaseUsernamePattern.test(value)) return usernameValidationMessage;
   return null;
 }
 
@@ -179,7 +185,7 @@ export function createAuthService(authClient: CloudBaseAuthClient): AuthService 
 
     async startEmailSignUp(credentials) {
       const email = credentials.email.trim();
-      const username = credentials.username?.trim() || undefined;
+      const username = normalizeUsername(credentials.username ?? "") || undefined;
 
       assertValidEmail(email);
       const usernameError = validateUsername(username ?? "");
@@ -225,8 +231,9 @@ export function createAuthService(authClient: CloudBaseAuthClient): AuthService 
     },
 
     async signIn(credentials) {
-      const account = credentials.account.trim();
-      const isEmailAccount = account.includes("@");
+      const trimmedAccount = credentials.account.trim();
+      const isEmailAccount = trimmedAccount.includes("@");
+      const account = isEmailAccount ? trimmedAccount : normalizeUsername(trimmedAccount);
 
       if (isEmailAccount) {
         assertValidEmail(account);

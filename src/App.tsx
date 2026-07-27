@@ -26,6 +26,7 @@ import { createCloudRepository } from "./services/cloudbase/cloudRepository";
 import { createLocalStorageRepository } from "./services/storage/appRepository";
 import { createSyncManager, type SyncManager } from "./services/sync/syncManager";
 import type { SyncState } from "./services/sync/syncTypes";
+import { syncLabel, syncMessage } from "./services/sync/syncDisplay";
 
 const activeRecordXp = (records: DailyRecord[]) =>
   records
@@ -86,25 +87,6 @@ const createCloudRuntime = (): CloudRuntime | null => {
 const accountNameForUser = (
   user: { accountName: string | null; email: string | null; username: string | null } | null
 ) => user?.accountName ?? user?.username ?? user?.email ?? null;
-
-const syncLabel = (t: ReturnType<typeof useI18n>["t"], syncState: SyncState) => {
-  switch (syncState.mode) {
-    case "syncing":
-      return t.sync.syncing;
-    case "synced":
-      return t.sync.synced;
-    case "offline":
-      return t.sync.offline;
-    case "error":
-      return t.sync.error;
-    case "guest":
-    default:
-      return t.sync.guest;
-  }
-};
-
-const syncMessage = (t: ReturnType<typeof useI18n>["t"], syncState: SyncState) =>
-  syncState.code ? t.sync.messages[syncState.code] : syncState.message;
 
 function SyncStatusBadge({
   cloudbaseConfigured,

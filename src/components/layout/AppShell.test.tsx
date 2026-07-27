@@ -33,4 +33,31 @@ describe("AppShell", () => {
 
     expect(onViewChange).toHaveBeenCalledWith("timer");
   });
+
+  it("hides overview-only header slots while keeping navigation and main content for non-overview views", () => {
+    const onViewChange = vi.fn();
+
+    const { container } = renderWithI18n(
+      <AppShell
+        activeView="timer"
+        authSlot={<div data-testid="auth-slot">Auth</div>}
+        onViewChange={onViewChange}
+        summary={<div data-testid="summary">Summary</div>}
+        syncStatusSlot={<div data-testid="sync-slot">Sync</div>}
+      >
+        <div>Timer workspace</div>
+      </AppShell>
+    );
+
+    expect(screen.queryByTestId("summary")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("auth-slot")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("sync-slot")).not.toBeInTheDocument();
+    expect(container.querySelector("header")).not.toBeInTheDocument();
+    expect(screen.getByTestId("dashboard-navigation")).toBeVisible();
+    expect(screen.getByRole("link", { name: "Timer" })).toHaveAttribute(
+      "aria-current",
+      "page"
+    );
+    expect(screen.getByRole("main")).toHaveTextContent("Timer workspace");
+  });
 });

@@ -12,12 +12,14 @@ import type {
 } from "../../services/cloudbase/authService";
 import {
   authErrorCodeFrom,
+  normalizeUsername,
   validateEmail,
   validatePassword,
   validateUsername
 } from "../../services/cloudbase/authService";
 import { useI18n } from "../../i18n/I18nProvider";
 import { Button } from "../ui/Button";
+import { textInputClassName } from "../ui/inputStyles";
 
 export interface AuthPanelProps {
   status: "loading" | "guest" | "authenticated" | "error";
@@ -51,7 +53,7 @@ function TextField({ error, label, ...props }: TextFieldProps) {
       <input
         aria-describedby={error ? errorId : undefined}
         aria-invalid={error ? true : undefined}
-        className="mt-1 h-9 w-full min-w-0 rounded-[6px] border border-white/75 bg-white/70 px-2.5 text-sm font-semibold text-ink shadow-[0_1px_0_rgba(255,255,255,0.78)_inset] outline-none backdrop-blur transition focus:border-ielts-blue focus:ring-2 focus:ring-blue-100"
+        className={textInputClassName}
         id={id}
         {...props}
       />
@@ -64,13 +66,18 @@ function TextField({ error, label, ...props }: TextFieldProps) {
   );
 }
 
-const validateAccount = (account: string) => {
+const normalizeSignInAccount = (account: string) => {
   const trimmedAccount = account.trim();
-  if (!trimmedAccount) return false;
+  return trimmedAccount.includes("@") ? trimmedAccount : normalizeUsername(trimmedAccount);
+};
 
-  return trimmedAccount.includes("@")
-    ? validateEmail(trimmedAccount) === null
-    : validateUsername(trimmedAccount) === null;
+const validateAccount = (account: string) => {
+  const normalizedAccount = normalizeSignInAccount(account);
+  if (!normalizedAccount) return false;
+
+  return normalizedAccount.includes("@")
+    ? validateEmail(normalizedAccount) === null
+    : validateUsername(normalizedAccount) === null;
 };
 
 export function AuthPanel({
@@ -128,7 +135,7 @@ export function AuthPanel({
     setIsSubmitting(true);
     try {
       await onSignIn({
-        account: signInAccount.trim(),
+        account: normalizeSignInAccount(signInAccount),
         password: signInPassword
       });
     } catch (error) {
@@ -143,12 +150,12 @@ export function AuthPanel({
     resetErrors();
 
     const trimmedEmail = signUpEmail.trim();
-    const trimmedUsername = signUpUsername.trim();
+    const normalizedUsername = normalizeUsername(signUpUsername);
     const nextErrors: FieldErrors = {};
     if (validateEmail(trimmedEmail)) {
       nextErrors.email = t.auth.validation.emailHelp;
     }
-    if (validateUsername(trimmedUsername)) {
+    if (validateUsername(normalizedUsername)) {
       nextErrors.username = t.auth.validation.usernameHelp;
     }
     if (validatePassword(signUpPassword)) {
@@ -163,8 +170,8 @@ export function AuthPanel({
       email: trimmedEmail,
       password: signUpPassword
     };
-    if (trimmedUsername) {
-      credentials.username = trimmedUsername;
+    if (normalizedUsername) {
+      credentials.username = normalizedUsername;
     }
 
     setIsSubmitting(true);
@@ -353,7 +360,7 @@ export function AuthPanel({
             autoComplete="username"
             error={fieldErrors.username}
             label={t.auth.username}
-            onChange={(event) => setSignUpUsername(event.currentTarget.value)}
+            onChange={(event) => setSignUpUsername(event.currentTarget.value.toLowerCase())}
             type="text"
             value={signUpUsername}
           />

@@ -27,8 +27,19 @@ describe("StudyTimerPanel", () => {
 
     const manualForm = screen.getByTestId("manual-external-time-form");
     await user.selectOptions(within(manualForm).getByLabelText("Manual section"), "writing");
-    await user.clear(within(manualForm).getByLabelText("Manual minutes"));
-    await user.type(within(manualForm).getByLabelText("Manual minutes"), "45");
+    const manualMinutesInput = within(manualForm).getByLabelText("Manual minutes");
+
+    expect(manualMinutesInput).toHaveClass(
+      "max-w-[7rem]",
+      "border-slate-300",
+      "bg-white",
+      "focus:border-ielts-blue",
+      "focus:ring-2",
+      "focus:ring-blue-200"
+    );
+
+    await user.clear(manualMinutesInput);
+    await user.type(manualMinutesInput, "45");
     await user.click(within(manualForm).getByRole("button", { name: /record external time/i }));
 
     expect(addTimerSession).toHaveBeenCalledTimes(1);

@@ -79,8 +79,8 @@ const createRepository = ({
   saveError
 }: {
   cloudState?: AppState | null;
-  loadError?: Error;
-  saveError?: Error;
+  loadError?: unknown;
+  saveError?: unknown;
 } = {}) => {
   const savedStates: AppState[] = [];
   const repository: CloudRepository = {
@@ -372,6 +372,52 @@ describe("sync manager", () => {
     });
   });
 
+  it("maps CloudBase schema cache import failures to a sync error code", async () => {
+    const localState: AppState = {
+      ...createDefaultAppState(now),
+      records: [createRecord({ syncStatus: "pending" })]
+    };
+    const { repository } = createRepository({
+      loadError: new Error(
+        "DATABASE_PGRST002: Could not query the database for the schema cache"
+      )
+    });
+    const manager = createSyncManager(repository);
+
+    const result = await manager.importOrLoad("cloud-user-1", localState, "weihao_01");
+
+    expect(repository.saveCloudState).not.toHaveBeenCalled();
+    expect(result.state).toEqual(localState);
+    expect(result.syncState).toEqual({
+      mode: "error",
+      code: "cloudbase-api-unavailable",
+      message: null,
+      lastSyncedAt: null
+    });
+  });
+
+  it("maps CloudBase database error codes from import load error objects", async () => {
+    const localState: AppState = {
+      ...createDefaultAppState(now),
+      records: [createRecord({ syncStatus: "pending" })]
+    };
+    const { repository } = createRepository({
+      loadError: { code: "DATABASE_PGRST002" }
+    });
+    const manager = createSyncManager(repository);
+
+    const result = await manager.importOrLoad("cloud-user-1", localState, "weihao_01");
+
+    expect(repository.saveCloudState).not.toHaveBeenCalled();
+    expect(result.state).toEqual(localState);
+    expect(result.syncState).toEqual({
+      mode: "error",
+      code: "cloudbase-api-unavailable",
+      message: null,
+      lastSyncedAt: null
+    });
+  });
+
   it("returns the original local state when import save fails", async () => {
     const localState: AppState = {
       ...createDefaultAppState(now),
@@ -387,6 +433,28 @@ describe("sync manager", () => {
     expect(result.syncState).toEqual({
       mode: "error",
       message: "save failed",
+      lastSyncedAt: null
+    });
+  });
+
+  it("maps CloudBase schema cache save failures during import to a sync error code", async () => {
+    const localState: AppState = {
+      ...createDefaultAppState(now),
+      records: [createRecord({ syncStatus: "pending" })]
+    };
+    const { repository } = createRepository({
+      saveError: new Error("CloudBase schema cache temporarily unavailable")
+    });
+    const manager = createSyncManager(repository);
+
+    const result = await manager.importOrLoad("cloud-user-1", localState, "weihao_01");
+
+    expect(repository.saveCloudState).toHaveBeenCalledOnce();
+    expect(result.state).toEqual(localState);
+    expect(result.syncState).toEqual({
+      mode: "error",
+      code: "cloudbase-api-unavailable",
+      message: null,
       lastSyncedAt: null
     });
   });
@@ -431,6 +499,48 @@ describe("sync manager", () => {
     expect(result.syncState).toEqual({
       mode: "error",
       message: "network down",
+      lastSyncedAt: null
+    });
+  });
+
+  it("maps 503 push failures to a sync error code", async () => {
+    const state = {
+      ...createDefaultAppState(now),
+      records: [createRecord({ syncStatus: "pending" })]
+    };
+    const { repository } = createRepository({
+      saveError: new Error("request failed with status 503")
+    });
+    const manager = createSyncManager(repository);
+
+    const result = await manager.push(state, "weihao_01");
+
+    expect(result.state).toEqual(state);
+    expect(result.syncState).toEqual({
+      mode: "error",
+      code: "cloudbase-api-unavailable",
+      message: null,
+      lastSyncedAt: null
+    });
+  });
+
+  it("maps CloudBase database error codes from push Error fields", async () => {
+    const state = {
+      ...createDefaultAppState(now),
+      records: [createRecord({ syncStatus: "pending" })]
+    };
+    const { repository } = createRepository({
+      saveError: Object.assign(new Error("request failed"), { code: "DATABASE_PGRST002" })
+    });
+    const manager = createSyncManager(repository);
+
+    const result = await manager.push(state, "weihao_01");
+
+    expect(result.state).toEqual(state);
+    expect(result.syncState).toEqual({
+      mode: "error",
+      code: "cloudbase-api-unavailable",
+      message: null,
       lastSyncedAt: null
     });
   });

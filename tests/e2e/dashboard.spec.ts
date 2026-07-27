@@ -137,6 +137,7 @@ test("daily check-in updates completion", async ({ page }) => {
   await checkIn.getByLabel("Words actual").fill("100");
 
   await expect(checkIn.getByLabel("Words complete")).toBeVisible();
+  await openView(page, "Overview");
   await expect(page.getByRole("progressbar", { name: "Today completion" })).toHaveAttribute(
     "aria-valuenow",
     "13"
@@ -191,7 +192,9 @@ test("auth panel opens and validates credentials without real CloudBase credenti
   await signInForm.getByRole("button", { name: "Sign in" }).click();
 
   await expect(
-    panel.getByText("Use a valid email or a 5-24 character username.")
+    panel.getByText(
+      "Use a valid email or a 6-25 lowercase username that starts with a letter and uses only numbers, underscores, or hyphens after that."
+    )
   ).toBeVisible();
   await expect(
     panel.getByText("Password must be 8-32 characters and include letters and numbers.")
@@ -208,7 +211,7 @@ test("auth panel opens and validates credentials without real CloudBase credenti
   await expect(panel.getByText("Enter a valid email address.")).toBeVisible();
   await expect(
     panel.getByText(
-      "Username must be 5-24 characters and may use letters, numbers, underscores, or hyphens."
+      "Username is optional. If filled, use 6-25 lowercase characters, start with a letter, and use only numbers, underscores, or hyphens after that."
     )
   ).toBeVisible();
   await expect(
